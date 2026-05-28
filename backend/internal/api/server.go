@@ -96,6 +96,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleRooms(w, r, segments)
 	case "profile":
 		s.handleProfile(w, r)
+	case "points":
+		s.handlePoints(w, r, segments)
 	case "onboarding":
 		s.handleOnboarding(w, r, segments)
 	case "exports":

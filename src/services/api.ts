@@ -1,4 +1,4 @@
-import { LogType, type AuthResponse, type AuthSessionResponse, type AuthUser, type BootstrapData, type Character, type CharacterDraftInput, type CharacterImageInput, type GameSettings, type ImageEditInput, type ModelCapabilities, type ModelMediaResult, type Profile, type Room, type SceneImageInput, type ScriptLine, type StoryDraftInput, type StoryImageInput, type StorySetting } from '@/src/types';
+import { LogType, type AuthResponse, type AuthSessionResponse, type AuthUser, type BootstrapData, type Character, type CharacterDraftInput, type CharacterImageInput, type GameSettings, type ImageEditInput, type ModelCapabilities, type ModelMediaResult, type PointTransaction, type Profile, type Room, type SceneImageInput, type ScriptLine, type StoryDraftInput, type StoryImageInput, type StorySetting } from '@/src/types';
 import { MOCK_CHARACTERS, MOCK_MARKET_CHARACTERS, MOCK_STORY_SETTINGS, mockService } from '@/src/mockData';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
@@ -414,6 +414,10 @@ export const apiService = {
     } catch {
       return profile;
     }
+  },
+
+  async getPointTransactions(limit = 50): Promise<PointTransaction[]> {
+    return await request<PointTransaction[]>(`/api/points/transactions?limit=${encodeURIComponent(String(limit))}`);
   },
 
   async generateProfileAvatar(input: { nickname: string; signature: string; tags: string[]; prompt?: string }): Promise<string> {

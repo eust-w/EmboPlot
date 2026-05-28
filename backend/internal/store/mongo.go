@@ -339,6 +339,32 @@ func (m *MongoStore) CreditPoints(ctx context.Context, userID string, amount int
 	return m.syncPointProfileAndRecord(ctx, user, amount, reason, metadata, now)
 }
 
+func (m *MongoStore) ListPointTransactions(ctx context.Context, userID string, limit int) ([]models.PointTransaction, error) {
+	if _, err := m.GetUserByID(ctx, userID); err != nil {
+		return nil, err
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	cursor, err := m.points.Find(
+		ctx,
+		bson.M{"userId": userID},
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetLimit(int64(limit)),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var items []models.PointTransaction
+	if err := cursor.All(ctx, &items); err != nil {
+		return nil, err
+	}
+	if items == nil {
+		return []models.PointTransaction{}, nil
+	}
+	return items, nil
+}
+
 func (m *MongoStore) syncPointProfileAndRecord(ctx context.Context, user models.User, delta int, reason string, metadata map[string]string, now time.Time) (models.Profile, error) {
 	var profile models.Profile
 	err := m.profiles.FindOneAndUpdate(

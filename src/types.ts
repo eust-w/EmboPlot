@@ -139,6 +139,16 @@ export interface Profile {
   updatedAt?: string;
 }
 
+export interface PointTransaction {
+  id: string;
+  userId: string;
+  delta: number;
+  balanceAfter: number;
+  reason: string;
+  metadata?: Record<string, string>;
+  createdAt: string;
+}
+
 export interface AuthUser {
   id: string;
   email: string;

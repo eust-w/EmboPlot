@@ -20,6 +20,7 @@ type Repository interface {
 	UpdateUser(context.Context, models.User) (models.User, error)
 	DebitPoints(context.Context, string, int, string, map[string]string) (models.Profile, error)
 	CreditPoints(context.Context, string, int, string, map[string]string) (models.Profile, error)
+	ListPointTransactions(context.Context, string, int) ([]models.PointTransaction, error)
 	Bootstrap(context.Context, string) (models.Bootstrap, error)
 	ListCharacters(context.Context, string, string) ([]models.Character, error)
 	SaveCharacter(context.Context, string, models.Character) (models.Character, error)

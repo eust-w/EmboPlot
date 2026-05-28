@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, Coins, CreditCard, Edit2, Camera, X, LogOut, Image as ImageIcon, Loader2, Sparkles, Upload } from 'lucide-react';
+import { ChevronLeft, Coins, CreditCard, Edit2, Camera, X, LogOut, Image as ImageIcon, Loader2, Sparkles, Upload, History, RefreshCw, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Profile } from '@/src/types';
+import { PointTransaction, Profile } from '@/src/types';
 
 interface ProfileViewProps {
   profile: Profile;
+  transactions: PointTransaction[];
   onBack: () => void;
+  onRefreshTransactions: () => Promise<PointTransaction[]>;
   onSaveProfile: (profile: Profile) => Promise<Profile>;
   onGenerateProfileAvatar: (input: { nickname: string; signature: string; tags: string[]; prompt?: string }) => Promise<string>;
   onLogout: () => Promise<void>;
@@ -38,7 +40,55 @@ const fileToAvatarDataURL = (file: File): Promise<string> => new Promise((resolv
   reader.readAsDataURL(file);
 });
 
-export const ProfileView: React.FC<ProfileViewProps> = ({ profile: profileProp, onBack, onSaveProfile, onGenerateProfileAvatar, onLogout }) => {
+const POINT_REASON_LABELS: Record<string, string> = {
+  'ai:script_generate': '剧本推演',
+  'ai:character_parse': 'AI 解析角色',
+  'ai:character_generate': '生成角色卡',
+  'ai:story_generate': '生成故事背景',
+  'ai:image_generate': '生成图片',
+  'ai:character_image': '生成角色图',
+  'ai:story_image': '生成背景封面',
+  'ai:image_edit': '图像微调',
+  'ai:scene_image': '生成场景图',
+  'ai:speech': '角色配音',
+  'ai:audio_export': '整剧音频导出',
+  'ai:transcribe': '音频转写',
+  'ai:embed': '记忆向量化',
+  'ai:moderate': '内容安全审核',
+  'ai:vision': '图片理解',
+};
+
+const transactionLabel = (reason: string) => {
+  if (reason.startsWith('refund:')) {
+    const source = reason.slice('refund:'.length);
+    return `${POINT_REASON_LABELS[source] || source}退款`;
+  }
+  return POINT_REASON_LABELS[reason] || reason;
+};
+
+const formatTransactionTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+};
+
+const transactionMetaText = (transaction: PointTransaction) => {
+  const metadata = transaction.metadata || {};
+  const parts = [
+    metadata.roomId ? `剧场 ${metadata.roomId}` : '',
+    metadata.lines ? `${metadata.lines} 行` : '',
+    metadata.texts ? `${metadata.texts} 条文本` : '',
+    metadata.filename ? metadata.filename : '',
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : metadata.path || 'AI 能力调用';
+};
+
+export const ProfileView: React.FC<ProfileViewProps> = ({ profile: profileProp, transactions, onBack, onRefreshTransactions, onSaveProfile, onGenerateProfileAvatar, onLogout }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<Profile>(profileProp);
   const [avatarPrompt, setAvatarPrompt] = useState('');
@@ -46,6 +96,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile: profileProp, 
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isRefreshingTransactions, setIsRefreshingTransactions] = useState(false);
 
   const [editForm, setEditForm] = useState({ ...profile });
 
@@ -106,6 +157,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile: profileProp, 
       setAvatarError(error instanceof Error ? error.message : 'AI 头像生成失败');
     } finally {
       setIsGeneratingAvatar(false);
+    }
+  };
+
+  const handleRefreshTransactions = async () => {
+    setIsRefreshingTransactions(true);
+    try {
+      await onRefreshTransactions();
+    } finally {
+      setIsRefreshingTransactions(false);
     }
   };
 
@@ -224,6 +284,61 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile: profileProp, 
                   </div>
                 </motion.div>
               ))}
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-3">
+                积分流水 <span className="text-xs font-normal text-zinc-500 bg-white/5 px-3 py-1 rounded-full uppercase tracking-widest">Ledger</span>
+              </h2>
+              <button
+                type="button"
+                onClick={handleRefreshTransactions}
+                disabled={isRefreshingTransactions}
+                className="shrink-0 flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 px-3 py-2 text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-60"
+              >
+                <RefreshCw size={13} className={isRefreshingTransactions ? 'animate-spin' : ''} />
+                刷新
+              </button>
+            </div>
+
+            <div className="overflow-hidden rounded-3xl border border-white/5 bg-zinc-900">
+              {transactions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-zinc-500">
+                    <History size={22} />
+                  </div>
+                  <p className="text-sm font-bold text-zinc-300">暂无积分变动</p>
+                  <p className="mt-1 text-xs text-zinc-500">AI 推演、图片、配音和解析调用后会记录在这里。</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-white/5">
+                  {transactions.map((transaction) => {
+                    const isCredit = transaction.delta > 0;
+                    return (
+                      <div key={transaction.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-4 lg:px-6">
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${isCredit ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
+                          {isCredit ? <ArrowUpRight size={18} /> : <ArrowDownLeft size={18} />}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <p className="text-sm font-bold text-zinc-100">{transactionLabel(transaction.reason)}</p>
+                            <span className="text-[10px] font-mono text-zinc-600">{formatTransactionTime(transaction.createdAt)}</span>
+                          </div>
+                          <p className="mt-1 truncate text-[11px] text-zinc-500">{transactionMetaText(transaction)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-sm font-black ${isCredit ? 'text-emerald-300' : 'text-amber-300'}`}>
+                            {isCredit ? '+' : ''}{transaction.delta}
+                          </p>
+                          <p className="mt-1 text-[10px] font-mono text-zinc-600">余额 {transaction.balanceAfter}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </section>
         </div>

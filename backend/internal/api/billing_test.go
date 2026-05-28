@@ -83,6 +83,53 @@ func TestInsufficientPointsBlocksAIRequest(t *testing.T) {
 	}
 }
 
+func TestPointTransactionsEndpointReturnsDetailedLedger(t *testing.T) {
+	repo := store.NewMemoryStore()
+	server := api.NewServer(repo, api.ServerOptions{ModelGateway: fakeGateway{}})
+	cookie := registerTestUser(t, server, "billing-ledger@example.com")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/models/speech", strings.NewReader(`{"text":"你好","voiceName":"Cherry"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected speech status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/points/transactions?limit=5", nil)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected ledger status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var transactions []struct {
+		ID           string            `json:"id"`
+		Delta        int               `json:"delta"`
+		BalanceAfter int               `json:"balanceAfter"`
+		Reason       string            `json:"reason"`
+		Metadata     map[string]string `json:"metadata"`
+		CreatedAt    string            `json:"createdAt"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &transactions); err != nil {
+		t.Fatalf("decode transactions: %v", err)
+	}
+	if len(transactions) != 1 {
+		t.Fatalf("expected one transaction, got %+v", transactions)
+	}
+	got := transactions[0]
+	if got.ID == "" || got.CreatedAt == "" {
+		t.Fatalf("expected id and createdAt, got %+v", got)
+	}
+	if got.Delta != -2 || got.BalanceAfter != 298 || got.Reason != "ai:speech" {
+		t.Fatalf("unexpected transaction: %+v", got)
+	}
+	if got.Metadata["path"] != "/api/models/speech" {
+		t.Fatalf("expected path metadata, got %+v", got.Metadata)
+	}
+}
+
 func TestBillableModelRoutesDeductPoints(t *testing.T) {
 	tests := []struct {
 		name string

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { LogType, type TheaterState, type AppView, type AssetCategory, type ScriptLine, type BootstrapData, type Room, type Character, type StorySetting, type Profile, type AuthUser, type SpeechTarget } from '@/src/types';
+import { LogType, type TheaterState, type AppView, type AssetCategory, type ScriptLine, type BootstrapData, type Room, type Character, type StorySetting, type Profile, type AuthUser, type SpeechTarget, type PointTransaction } from '@/src/types';
 import { MOCK_CHARACTERS, MOCK_STORY_SETTINGS } from '@/src/mockData';
 import { RoomsView } from '@/src/components/RoomsView';
 import { MarketView } from '@/src/components/MarketView';
@@ -83,6 +83,7 @@ export default function App() {
   const [bootstrap, setBootstrap] = useState<BootstrapData>(fallbackBootstrap);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authStatus, setAuthStatus] = useState<'loading' | 'ready'>('loading');
+  const [pointTransactions, setPointTransactions] = useState<PointTransaction[]>([]);
 
   const [input, setInput] = useState('');
   const [showMentions, setShowMentions] = useState(false);
@@ -118,6 +119,17 @@ export default function App() {
     return data;
   };
 
+  const loadPointTransactions = async () => {
+    try {
+      const items = await apiService.getPointTransactions();
+      setPointTransactions(items);
+      return items;
+    } catch {
+      setPointTransactions([]);
+      return [];
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     apiService.getCurrentUser()
@@ -129,6 +141,7 @@ export default function App() {
         }
         setAuthUser(user);
         await loadBootstrap();
+        await loadPointTransactions();
         if (!cancelled) setAuthStatus('ready');
       })
       .catch(() => {
@@ -148,10 +161,17 @@ export default function App() {
         profile: { ...prev.profile, points: detail.points },
       }));
       setAuthUser(prev => prev ? { ...prev, points: detail.points } : prev);
+      void loadPointTransactions();
     };
     window.addEventListener('emboplot:points-updated', handlePointsUpdated);
     return () => window.removeEventListener('emboplot:points-updated', handlePointsUpdated);
   }, []);
+
+  useEffect(() => {
+    if (authUser && state.view === 'profile') {
+      void loadPointTransactions();
+    }
+  }, [authUser, state.view]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -520,6 +540,7 @@ export default function App() {
     await apiService.logout();
     setAuthUser(null);
     setBootstrap(fallbackBootstrap);
+    setPointTransactions([]);
     setState(initialState());
   };
 
@@ -559,6 +580,8 @@ export default function App() {
         return (
           <ProfileView
             profile={bootstrap.profile}
+            transactions={pointTransactions}
+            onRefreshTransactions={loadPointTransactions}
             onSaveProfile={handleUpdateProfile}
             onGenerateProfileAvatar={apiService.generateProfileAvatar}
             onLogout={handleLogout}

@@ -173,6 +173,31 @@ func (m *MemoryStore) CreditPoints(_ context.Context, userID string, amount int,
 	return profile, nil
 }
 
+func (m *MemoryStore) ListPointTransactions(_ context.Context, userID string, limit int) ([]models.PointTransaction, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if _, ok := m.users[userID]; !ok {
+		return nil, ErrNotFound
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	items := make([]models.PointTransaction, 0, len(m.points))
+	for _, item := range m.points {
+		if item.UserID == userID {
+			items = append(items, item)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].CreatedAt.After(items[j].CreatedAt)
+	})
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
+}
+
 func (m *MemoryStore) recordPointTransaction(userID string, delta int, balanceAfter int, reason string, metadata map[string]string, now time.Time) {
 	transaction := models.PointTransaction{
 		ID:           NewID("ptx"),
