@@ -18,6 +18,7 @@ type MemoryStore struct {
 	assets     map[string]models.Asset
 	rooms      map[string]models.Room
 	points     map[string]models.PointTransaction
+	payments   map[string]models.PaymentOrder
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -30,6 +31,7 @@ func NewMemoryStore() *MemoryStore {
 		assets:     make(map[string]models.Asset),
 		rooms:      make(map[string]models.Room),
 		points:     make(map[string]models.PointTransaction),
+		payments:   make(map[string]models.PaymentOrder),
 	}
 	for _, item := range append(seed.Characters, seed.MarketCharacters...) {
 		store.characters[item.ID] = item
@@ -196,6 +198,67 @@ func (m *MemoryStore) ListPointTransactions(_ context.Context, userID string, li
 		items = items[:limit]
 	}
 	return items, nil
+}
+
+func (m *MemoryStore) SavePaymentOrder(_ context.Context, userID string, order models.PaymentOrder) (models.PaymentOrder, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.users[userID]; !ok {
+		return models.PaymentOrder{}, ErrNotFound
+	}
+	now := time.Now().UTC()
+	if order.ID == "" {
+		order.ID = NewID("pay")
+	}
+	if order.TradeOrderID == "" {
+		order.TradeOrderID = order.ID
+	}
+	if existing, ok := m.payments[order.TradeOrderID]; ok && existing.ID != order.ID {
+		return models.PaymentOrder{}, ErrDuplicate
+	}
+	order.UserID = userID
+	if order.Provider == "" {
+		order.Provider = "hupijiao"
+	}
+	if order.Status == "" {
+		order.Status = "pending"
+	}
+	if order.CreatedAt.IsZero() {
+		order.CreatedAt = now
+	}
+	order.UpdatedAt = now
+	m.payments[order.TradeOrderID] = order
+	return order, nil
+}
+
+func (m *MemoryStore) GetPaymentOrderByTradeID(_ context.Context, tradeOrderID string) (models.PaymentOrder, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	order, ok := m.payments[tradeOrderID]
+	if !ok {
+		return models.PaymentOrder{}, ErrNotFound
+	}
+	return order, nil
+}
+
+func (m *MemoryStore) MarkPaymentOrderPaid(_ context.Context, tradeOrderID string, openOrderID string, transactionID string) (models.PaymentOrder, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	order, ok := m.payments[tradeOrderID]
+	if !ok {
+		return models.PaymentOrder{}, false, ErrNotFound
+	}
+	wasPending := order.Status != "paid"
+	now := time.Now().UTC()
+	order.Status = "paid"
+	order.OpenOrderID = firstNonEmpty(openOrderID, order.OpenOrderID)
+	order.TransactionID = firstNonEmpty(transactionID, order.TransactionID)
+	order.UpdatedAt = now
+	if order.PaidAt == nil {
+		order.PaidAt = &now
+	}
+	m.payments[tradeOrderID] = order
+	return order, wasPending, nil
 }
 
 func (m *MemoryStore) recordPointTransaction(userID string, delta int, balanceAfter int, reason string, metadata map[string]string, now time.Time) {

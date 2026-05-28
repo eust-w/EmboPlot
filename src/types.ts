@@ -149,6 +149,22 @@ export interface PointTransaction {
   createdAt: string;
 }
 
+export interface RechargePlan {
+  id: string;
+  label: string;
+  points: number;
+  amountCents: number;
+}
+
+export interface RechargeOrder {
+  tradeOrderId: string;
+  payUrl: string;
+  qrCodeUrl: string;
+  points: number;
+  amountCents: number;
+  status: 'pending' | 'paid' | string;
+}
+
 export interface AuthUser {
   id: string;
   email: string;

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { LogType, type TheaterState, type AppView, type AssetCategory, type ScriptLine, type BootstrapData, type Room, type Character, type StorySetting, type Profile, type AuthUser, type SpeechTarget, type PointTransaction } from '@/src/types';
+import { LogType, type TheaterState, type AppView, type AssetCategory, type ScriptLine, type BootstrapData, type Room, type Character, type StorySetting, type Profile, type AuthUser, type SpeechTarget, type PointTransaction, type RechargeOrder, type RechargePlan } from '@/src/types';
 import { MOCK_CHARACTERS, MOCK_STORY_SETTINGS } from '@/src/mockData';
 import { RoomsView } from '@/src/components/RoomsView';
 import { MarketView } from '@/src/components/MarketView';
@@ -9,7 +9,7 @@ import { SetupView } from '@/src/components/SetupView';
 import { ProfileView } from '@/src/components/ProfileView';
 import { Sidebar } from '@/src/components/Sidebar';
 import { AuthView } from '@/src/components/AuthView';
-import { apiService, fallbackBootstrap } from '@/src/services/api';
+import { apiService, fallbackBootstrap, fallbackRechargePlans } from '@/src/services/api';
 import { domToPng } from 'modern-screenshot';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, Menu } from 'lucide-react';
@@ -84,6 +84,7 @@ export default function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authStatus, setAuthStatus] = useState<'loading' | 'ready'>('loading');
   const [pointTransactions, setPointTransactions] = useState<PointTransaction[]>([]);
+  const [rechargePlans, setRechargePlans] = useState<RechargePlan[]>(fallbackRechargePlans);
 
   const [input, setInput] = useState('');
   const [showMentions, setShowMentions] = useState(false);
@@ -130,6 +131,12 @@ export default function App() {
     }
   };
 
+  const loadRechargePlans = async () => {
+    const plans = await apiService.getRechargePlans();
+    setRechargePlans(plans);
+    return plans;
+  };
+
   useEffect(() => {
     let cancelled = false;
     apiService.getCurrentUser()
@@ -141,6 +148,7 @@ export default function App() {
         }
         setAuthUser(user);
         await loadBootstrap();
+        await loadRechargePlans();
         await loadPointTransactions();
         if (!cancelled) setAuthStatus('ready');
       })
@@ -530,9 +538,16 @@ export default function App() {
     return updated;
   };
 
+  const handleCreateRechargeOrder = async (planId: string): Promise<RechargeOrder> => {
+    const order = await apiService.createRechargeOrder(planId);
+    void loadPointTransactions();
+    return order;
+  };
+
   const handleAuthenticated = async (user: AuthUser) => {
     setAuthUser(user);
     await loadBootstrap();
+    await loadRechargePlans();
     setState(prev => ({ ...prev, view: 'rooms' }));
   };
 
@@ -581,7 +596,9 @@ export default function App() {
           <ProfileView
             profile={bootstrap.profile}
             transactions={pointTransactions}
+            rechargePlans={rechargePlans}
             onRefreshTransactions={loadPointTransactions}
+            onCreateRechargeOrder={handleCreateRechargeOrder}
             onSaveProfile={handleUpdateProfile}
             onGenerateProfileAvatar={apiService.generateProfileAvatar}
             onLogout={handleLogout}

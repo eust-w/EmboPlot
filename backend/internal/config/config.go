@@ -26,8 +26,16 @@ type Config struct {
 	MongoURI      string
 	MongoDatabase string
 	AllowedOrigin string
+	PublicBaseURL string
 	Auth          auth.Config
 	ModelGateway  modelgateway.Config
+	Payment       PaymentConfig
+}
+
+type PaymentConfig struct {
+	HupijiaoAppID      string
+	HupijiaoAppSecret  string
+	HupijiaoGatewayURL string
 }
 
 func Load() Config {
@@ -36,6 +44,7 @@ func Load() Config {
 		MongoURI:      getenv("MONGODB_URI", "mongodb://localhost:27017"),
 		MongoDatabase: getenv("MONGODB_DATABASE", "emboplot"),
 		AllowedOrigin: getenv("ALLOWED_ORIGIN", "http://localhost:3000"),
+		PublicBaseURL: getenv("PUBLIC_BASE_URL", getenv("APP_URL", "http://localhost:8080")),
 		Auth: auth.Config{
 			JWTSecret:    getenv("AUTH_JWT_SECRET", "dev-only-change-me"),
 			CookieName:   getenv("AUTH_COOKIE_NAME", "emboplot_session"),
@@ -57,6 +66,11 @@ func Load() Config {
 			ModerationModel:   getenv("DASHSCOPE_MODERATION_MODEL", "qwen-plus"),
 			ImageSize:         getenv("DASHSCOPE_IMAGE_SIZE", "1696*960"),
 			Timeout:           time.Duration(getenvInt("DASHSCOPE_TIMEOUT_SECONDS", 60)) * time.Second,
+		},
+		Payment: PaymentConfig{
+			HupijiaoAppID:      os.Getenv("HUPIJIAO_APP_ID"),
+			HupijiaoAppSecret:  os.Getenv("HUPIJIAO_APP_SECRET"),
+			HupijiaoGatewayURL: getenv("HUPIJIAO_GATEWAY_URL", "https://api.dpweixin.com/payment/do.html"),
 		},
 	}
 }

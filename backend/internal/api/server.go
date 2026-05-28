@@ -19,6 +19,7 @@ type ServerOptions struct {
 	Logger        *slog.Logger
 	Auth          auth.Config
 	ModelGateway  modelgateway.Gateway
+	Payment       PaymentConfig
 }
 
 type Server struct {
@@ -26,6 +27,7 @@ type Server struct {
 	modelGateway  modelgateway.Gateway
 	authManager   *auth.Manager
 	allowedOrigin string
+	payment       PaymentConfig
 	logger        *slog.Logger
 }
 
@@ -43,6 +45,7 @@ func NewServer(repo store.Repository, opts ServerOptions) *Server {
 		modelGateway:  gateway,
 		authManager:   auth.NewManager(opts.Auth),
 		allowedOrigin: opts.AllowedOrigin,
+		payment:       opts.Payment.withDefaults(),
 		logger:        logger,
 	}
 }
@@ -98,6 +101,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleProfile(w, r)
 	case "points":
 		s.handlePoints(w, r, segments)
+	case "payments":
+		s.handlePayments(w, r, segments)
 	case "onboarding":
 		s.handleOnboarding(w, r, segments)
 	case "exports":
@@ -166,6 +171,9 @@ func (s *Server) isPublicRoute(segments []string, method string) bool {
 		return true
 	}
 	if segments[0] == "health" || segments[0] == "auth" {
+		return true
+	}
+	if len(segments) == 3 && segments[0] == "payments" && segments[1] == "hupijiao" && segments[2] == "notify" && method == http.MethodPost {
 		return true
 	}
 	return segments[0] == "models" && len(segments) == 2 && segments[1] == "capabilities" && method == http.MethodGet

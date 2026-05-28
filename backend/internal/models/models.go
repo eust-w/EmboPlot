@@ -144,6 +144,25 @@ type PointTransaction struct {
 	CreatedAt    time.Time         `bson:"createdAt" json:"createdAt"`
 }
 
+type PaymentOrder struct {
+	ID            string     `bson:"id" json:"id"`
+	UserID        string     `bson:"userId" json:"userId"`
+	Provider      string     `bson:"provider" json:"provider"`
+	TradeOrderID  string     `bson:"tradeOrderId" json:"tradeOrderId"`
+	OpenOrderID   string     `bson:"openOrderId,omitempty" json:"openOrderId,omitempty"`
+	TransactionID string     `bson:"transactionId,omitempty" json:"transactionId,omitempty"`
+	PlanID        string     `bson:"planId" json:"planId"`
+	Title         string     `bson:"title" json:"title"`
+	Points        int        `bson:"points" json:"points"`
+	AmountCents   int        `bson:"amountCents" json:"amountCents"`
+	Status        string     `bson:"status" json:"status"`
+	PayURL        string     `bson:"payUrl,omitempty" json:"payUrl,omitempty"`
+	QRCodeURL     string     `bson:"qrCodeUrl,omitempty" json:"qrCodeUrl,omitempty"`
+	CreatedAt     time.Time  `bson:"createdAt" json:"createdAt"`
+	UpdatedAt     time.Time  `bson:"updatedAt" json:"updatedAt"`
+	PaidAt        *time.Time `bson:"paidAt,omitempty" json:"paidAt,omitempty"`
+}
+
 type PublicUser struct {
 	ID          string    `json:"id"`
 	Email       string    `json:"email"`

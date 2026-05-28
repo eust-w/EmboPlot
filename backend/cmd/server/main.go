@@ -40,6 +40,14 @@ func main() {
 		Logger:        logger,
 		Auth:          cfg.Auth,
 		ModelGateway:  modelgateway.New(cfg.ModelGateway, nil),
+		Payment: api.PaymentConfig{
+			PublicBaseURL: cfg.PublicBaseURL,
+			Hupijiao: api.HupijiaoConfig{
+				AppID:      cfg.Payment.HupijiaoAppID,
+				AppSecret:  cfg.Payment.HupijiaoAppSecret,
+				GatewayURL: cfg.Payment.HupijiaoGatewayURL,
+			},
+		},
 	})
 
 	addr := ":" + cfg.Port

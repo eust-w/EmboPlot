@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, Coins, CreditCard, Edit2, Camera, X, LogOut, Image as ImageIcon, Loader2, Sparkles, Upload, History, RefreshCw, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { PointTransaction, Profile } from '@/src/types';
+import { PointTransaction, Profile, RechargeOrder, RechargePlan } from '@/src/types';
 
 interface ProfileViewProps {
   profile: Profile;
   transactions: PointTransaction[];
+  rechargePlans: RechargePlan[];
   onBack: () => void;
   onRefreshTransactions: () => Promise<PointTransaction[]>;
+  onCreateRechargeOrder: (planId: string) => Promise<RechargeOrder>;
   onSaveProfile: (profile: Profile) => Promise<Profile>;
   onGenerateProfileAvatar: (input: { nickname: string; signature: string; tags: string[]; prompt?: string }) => Promise<string>;
   onLogout: () => Promise<void>;
@@ -56,6 +58,7 @@ const POINT_REASON_LABELS: Record<string, string> = {
   'ai:embed': '记忆向量化',
   'ai:moderate': '内容安全审核',
   'ai:vision': '图片理解',
+  'payment:hupijiao': '虎皮椒充值',
 };
 
 const transactionLabel = (reason: string) => {
@@ -84,15 +87,26 @@ const transactionMetaText = (transaction: PointTransaction) => {
     metadata.lines ? `${metadata.lines} 行` : '',
     metadata.texts ? `${metadata.texts} 条文本` : '',
     metadata.filename ? metadata.filename : '',
+    metadata.tradeOrderId ? `订单 ${metadata.tradeOrderId}` : '',
+    metadata.planId ? `套餐 ${metadata.planId}` : '',
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : metadata.path || 'AI 能力调用';
 };
 
-export const ProfileView: React.FC<ProfileViewProps> = ({ profile: profileProp, transactions, onBack, onRefreshTransactions, onSaveProfile, onGenerateProfileAvatar, onLogout }) => {
+const formatPrice = (amountCents: number) => {
+  if (!Number.isFinite(amountCents)) return '--';
+  return (amountCents / 100).toFixed(amountCents % 100 === 0 ? 0 : 2);
+};
+
+export const ProfileView: React.FC<ProfileViewProps> = ({ profile: profileProp, transactions, rechargePlans, onBack, onRefreshTransactions, onCreateRechargeOrder, onSaveProfile, onGenerateProfileAvatar, onLogout }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<Profile>(profileProp);
   const [avatarPrompt, setAvatarPrompt] = useState('');
   const [avatarError, setAvatarError] = useState('');
+  const [rechargeError, setRechargeError] = useState('');
+  const [rechargeStatus, setRechargeStatus] = useState('');
+  const [lastPaymentLink, setLastPaymentLink] = useState('');
+  const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -104,12 +118,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile: profileProp, 
     setProfile(profileProp);
     setEditForm(profileProp);
   }, [profileProp]);
-
-  const RECHARGE_PLANS = [
-    { id: '1', coins: 500, price: 49, label: '入门' },
-    { id: '2', coins: 1200, price: 99, label: '推荐' },
-    { id: '3', coins: 6500, price: 499, label: '超值' },
-  ];
 
   const handleSaveProfile = async () => {
     setIsSavingProfile(true);
@@ -166,6 +174,27 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile: profileProp, 
       await onRefreshTransactions();
     } finally {
       setIsRefreshingTransactions(false);
+    }
+  };
+
+  const handleRecharge = async (planId: string) => {
+    setPendingPlanId(planId);
+    setRechargeError('');
+    setRechargeStatus('');
+    setLastPaymentLink('');
+    try {
+      const order = await onCreateRechargeOrder(planId);
+      const target = order.payUrl || order.qrCodeUrl;
+      if (!target) {
+        throw new Error('支付链接生成失败');
+      }
+      setLastPaymentLink(target);
+      const popup = window.open(target, '_blank', 'noopener,noreferrer');
+      setRechargeStatus(popup ? `订单 ${order.tradeOrderId} 已创建` : `订单 ${order.tradeOrderId} 已创建，请打开支付链接`);
+    } catch (error) {
+      setRechargeError(error instanceof Error ? error.message : '支付订单创建失败');
+    } finally {
+      setPendingPlanId(null);
     }
   };
 
@@ -263,8 +292,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile: profileProp, 
               </h2>
             </div>
             
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
-              {RECHARGE_PLANS.map(plan => (
+            {(rechargeError || rechargeStatus) && (
+              <div className={`mb-5 rounded-2xl border px-4 py-3 text-xs ${rechargeError ? 'border-red-500/20 bg-red-500/10 text-red-200' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200'}`}>
+                <span>{rechargeError || rechargeStatus}</span>
+                {lastPaymentLink && (
+                  <a href={lastPaymentLink} target="_blank" rel="noreferrer" className="ml-3 font-black text-amber-300 hover:text-amber-200">
+                    打开支付
+                  </a>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+              {rechargePlans.map(plan => (
                 <motion.div 
                   key={plan.id}
                   whileHover={{ y: -4 }}
@@ -274,12 +314,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile: profileProp, 
                     <CreditCard size={24} className="lg:hidden" />
                     <CreditCard size={32} className="hidden lg:block" />
                   </div>
-                  <h4 className="text-lg lg:text-xl font-black mb-1">{plan.coins} 剧情币</h4>
+                  <h4 className="text-lg lg:text-xl font-black mb-1">{plan.points} 剧情币</h4>
                   <p className="text-[10px] text-zinc-500 mb-6 lg:mb-8 font-mono">{plan.label}流量包</p>
                   <div className="mt-auto w-full">
-                    <p className="text-2xl lg:text-3xl font-black mb-4 lg:mb-6 tracking-tighter">¥{plan.price}</p>
-                    <button className="w-full py-3 lg:py-4 bg-zinc-100 text-zinc-950 rounded-xl lg:rounded-2xl font-black text-sm hover:scale-105 active:scale-95 transition-all shadow-xl">
-                      立即获取
+                    <p className="text-2xl lg:text-3xl font-black mb-4 lg:mb-6 tracking-tighter">¥{formatPrice(plan.amountCents)}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleRecharge(plan.id)}
+                      disabled={pendingPlanId !== null}
+                      className="w-full py-3 lg:py-4 bg-zinc-100 text-zinc-950 rounded-xl lg:rounded-2xl font-black text-sm hover:scale-105 active:scale-95 transition-all shadow-xl disabled:opacity-60 disabled:hover:scale-100"
+                    >
+                      {pendingPlanId === plan.id ? '生成订单...' : '立即获取'}
                     </button>
                   </div>
                 </motion.div>

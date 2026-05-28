@@ -22,6 +22,7 @@ type MongoStore struct {
 	rooms      *mongo.Collection
 	profiles   *mongo.Collection
 	points     *mongo.Collection
+	payments   *mongo.Collection
 }
 
 func NewMongoStore(ctx context.Context, uri string, database string) (*MongoStore, error) {
@@ -44,6 +45,7 @@ func NewMongoStore(ctx context.Context, uri string, database string) (*MongoStor
 		rooms:      db.Collection("rooms"),
 		profiles:   db.Collection("profiles"),
 		points:     db.Collection("point_transactions"),
+		payments:   db.Collection("payment_orders"),
 	}, nil
 }
 
@@ -159,6 +161,8 @@ func (m *MongoStore) ensureIndexes(ctx context.Context) error {
 		{m.rooms, mongo.IndexModel{Keys: bson.D{{Key: "userId", Value: 1}}}},
 		{m.profiles, mongo.IndexModel{Keys: bson.D{{Key: "userId", Value: 1}}, Options: options.Index().SetUnique(true)}},
 		{m.points, mongo.IndexModel{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "createdAt", Value: -1}}}},
+		{m.payments, mongo.IndexModel{Keys: bson.D{{Key: "tradeOrderId", Value: 1}}, Options: options.Index().SetUnique(true)}},
+		{m.payments, mongo.IndexModel{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "createdAt", Value: -1}}}},
 	}
 	for _, item := range indexes {
 		if _, err := item.collection.Indexes().CreateOne(ctx, item.model); err != nil {
@@ -363,6 +367,93 @@ func (m *MongoStore) ListPointTransactions(ctx context.Context, userID string, l
 		return []models.PointTransaction{}, nil
 	}
 	return items, nil
+}
+
+func (m *MongoStore) SavePaymentOrder(ctx context.Context, userID string, order models.PaymentOrder) (models.PaymentOrder, error) {
+	if _, err := m.GetUserByID(ctx, userID); err != nil {
+		return models.PaymentOrder{}, err
+	}
+	now := time.Now().UTC()
+	if order.ID == "" {
+		order.ID = NewID("pay")
+	}
+	if order.TradeOrderID == "" {
+		order.TradeOrderID = order.ID
+	}
+	order.UserID = userID
+	if order.Provider == "" {
+		order.Provider = "hupijiao"
+	}
+	if order.Status == "" {
+		order.Status = "pending"
+	}
+	if order.CreatedAt.IsZero() {
+		order.CreatedAt = now
+	}
+	order.UpdatedAt = now
+	existing, err := m.GetPaymentOrderByTradeID(ctx, order.TradeOrderID)
+	if err == nil && existing.ID != order.ID {
+		return models.PaymentOrder{}, ErrDuplicate
+	}
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return models.PaymentOrder{}, err
+	}
+	_, err = m.payments.UpdateOne(
+		ctx,
+		bson.M{"tradeOrderId": order.TradeOrderID},
+		bson.M{"$set": order},
+		options.UpdateOne().SetUpsert(true),
+	)
+	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return models.PaymentOrder{}, ErrDuplicate
+		}
+		return models.PaymentOrder{}, err
+	}
+	return order, nil
+}
+
+func (m *MongoStore) GetPaymentOrderByTradeID(ctx context.Context, tradeOrderID string) (models.PaymentOrder, error) {
+	var order models.PaymentOrder
+	err := m.payments.FindOne(ctx, bson.M{"tradeOrderId": tradeOrderID}).Decode(&order)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return models.PaymentOrder{}, ErrNotFound
+	}
+	return order, err
+}
+
+func (m *MongoStore) MarkPaymentOrderPaid(ctx context.Context, tradeOrderID string, openOrderID string, transactionID string) (models.PaymentOrder, bool, error) {
+	existing, err := m.GetPaymentOrderByTradeID(ctx, tradeOrderID)
+	if err != nil {
+		return models.PaymentOrder{}, false, err
+	}
+	wasPending := existing.Status != "paid"
+	now := time.Now().UTC()
+	update := bson.M{
+		"$set": bson.M{
+			"status":        "paid",
+			"openOrderId":   firstNonEmpty(openOrderID, existing.OpenOrderID),
+			"transactionId": firstNonEmpty(transactionID, existing.TransactionID),
+			"updatedAt":     now,
+		},
+	}
+	if existing.PaidAt == nil {
+		update["$set"].(bson.M)["paidAt"] = now
+	}
+	var order models.PaymentOrder
+	err = m.payments.FindOneAndUpdate(
+		ctx,
+		bson.M{"tradeOrderId": tradeOrderID},
+		update,
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&order)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return models.PaymentOrder{}, false, ErrNotFound
+	}
+	if err != nil {
+		return models.PaymentOrder{}, false, err
+	}
+	return order, wasPending, nil
 }
 
 func (m *MongoStore) syncPointProfileAndRecord(ctx context.Context, user models.User, delta int, reason string, metadata map[string]string, now time.Time) (models.Profile, error) {

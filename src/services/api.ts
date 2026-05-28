@@ -1,4 +1,4 @@
-import { LogType, type AuthResponse, type AuthSessionResponse, type AuthUser, type BootstrapData, type Character, type CharacterDraftInput, type CharacterImageInput, type GameSettings, type ImageEditInput, type ModelCapabilities, type ModelMediaResult, type PointTransaction, type Profile, type Room, type SceneImageInput, type ScriptLine, type StoryDraftInput, type StoryImageInput, type StorySetting } from '@/src/types';
+import { LogType, type AuthResponse, type AuthSessionResponse, type AuthUser, type BootstrapData, type Character, type CharacterDraftInput, type CharacterImageInput, type GameSettings, type ImageEditInput, type ModelCapabilities, type ModelMediaResult, type PointTransaction, type Profile, type RechargeOrder, type RechargePlan, type Room, type SceneImageInput, type ScriptLine, type StoryDraftInput, type StoryImageInput, type StorySetting } from '@/src/types';
 import { MOCK_CHARACTERS, MOCK_MARKET_CHARACTERS, MOCK_STORY_SETTINGS, mockService } from '@/src/mockData';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
@@ -106,6 +106,12 @@ export const fallbackBootstrap: BootstrapData = {
   assets: [],
   rooms: fallbackRooms(),
 };
+
+export const fallbackRechargePlans: RechargePlan[] = [
+  { id: 'starter', label: '入门', points: 500, amountCents: 4900 },
+  { id: 'pro', label: '推荐', points: 1200, amountCents: 9900 },
+  { id: 'max', label: '超值', points: 6500, amountCents: 49900 },
+];
 
 export const apiService = {
   async getCurrentUser(): Promise<AuthUser | null> {
@@ -418,6 +424,22 @@ export const apiService = {
 
   async getPointTransactions(limit = 50): Promise<PointTransaction[]> {
     return await request<PointTransaction[]>(`/api/points/transactions?limit=${encodeURIComponent(String(limit))}`);
+  },
+
+  async getRechargePlans(): Promise<RechargePlan[]> {
+    try {
+      const payload = await request<{ plans: RechargePlan[] }>('/api/payments/plans');
+      return payload.plans;
+    } catch {
+      return fallbackRechargePlans;
+    }
+  },
+
+  async createRechargeOrder(planId: string): Promise<RechargeOrder> {
+    return await request<RechargeOrder>('/api/payments/recharge', {
+      method: 'POST',
+      body: JSON.stringify({ planId }),
+    });
   },
 
   async generateProfileAvatar(input: { nickname: string; signature: string; tags: string[]; prompt?: string }): Promise<string> {
