@@ -298,6 +298,24 @@ export const apiService = {
     }
   },
 
+  async deleteCharacter(id: string): Promise<boolean> {
+    try {
+      await request<{ ok: boolean }>(`/api/characters/${id}`, { method: 'DELETE' });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async deleteStory(id: string): Promise<boolean> {
+    try {
+      await request<{ ok: boolean }>(`/api/stories/${id}`, { method: 'DELETE' });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   async publishCharacter(id: string): Promise<Character> {
     try {
       return await request<Character>(`/api/characters/${id}/publish`, { method: 'POST' });

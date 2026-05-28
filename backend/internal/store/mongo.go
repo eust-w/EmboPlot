@@ -596,6 +596,24 @@ func (m *MongoStore) UpdateCharacter(ctx context.Context, userID string, id stri
 	return item, nil
 }
 
+func (m *MongoStore) DeleteCharacter(ctx context.Context, userID string, id string) error {
+	existing, err := m.getCharacter(ctx, userID, id)
+	if err != nil {
+		return err
+	}
+	if existing.IsPublic {
+		return ErrPublishedLocked
+	}
+	result, err := m.characters.DeleteOne(ctx, bson.M{"id": id, "userId": userID})
+	if err != nil {
+		return err
+	}
+	if result.DeletedCount == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (m *MongoStore) PublishCharacter(ctx context.Context, userID string, id string) (models.Character, error) {
 	item, err := m.getCharacter(ctx, userID, id)
 	if err != nil {
@@ -607,7 +625,7 @@ func (m *MongoStore) PublishCharacter(ctx context.Context, userID string, id str
 		item.PublishedAt = &now
 	}
 	item.UpdatedAt = now
-	if _, err := m.characters.UpdateOne(ctx, bson.M{"id": id, "userId": userID}, bson.M{"$set": item}); err != nil {
+	if _, err := m.characters.UpdateOne(ctx, bson.M{"id": id, "userId": userID}, bson.M{"$set": visibilityUpdateSet(item.IsPublic, item.PublishedAt, item.UpdatedAt)}); err != nil {
 		return models.Character{}, err
 	}
 	return item, nil
@@ -624,7 +642,7 @@ func (m *MongoStore) UnpublishCharacter(ctx context.Context, userID string, id s
 	}
 	item.IsPublic = false
 	item.UpdatedAt = now
-	if _, err := m.characters.UpdateOne(ctx, bson.M{"id": id, "userId": userID}, bson.M{"$set": item}); err != nil {
+	if _, err := m.characters.UpdateOne(ctx, bson.M{"id": id, "userId": userID}, bson.M{"$set": visibilityUpdateSet(item.IsPublic, item.PublishedAt, item.UpdatedAt)}); err != nil {
 		return models.Character{}, err
 	}
 	return item, nil
@@ -700,6 +718,24 @@ func (m *MongoStore) SaveStory(ctx context.Context, userID string, item models.S
 	return item, err
 }
 
+func (m *MongoStore) DeleteStory(ctx context.Context, userID string, id string) error {
+	existing, err := m.getStory(ctx, userID, id)
+	if err != nil {
+		return err
+	}
+	if existing.IsPublic {
+		return ErrPublishedLocked
+	}
+	result, err := m.stories.DeleteOne(ctx, bson.M{"id": id, "userId": userID})
+	if err != nil {
+		return err
+	}
+	if result.DeletedCount == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (m *MongoStore) PublishStory(ctx context.Context, userID string, id string) (models.StorySetting, error) {
 	item, err := m.getStory(ctx, userID, id)
 	if err != nil {
@@ -711,7 +747,7 @@ func (m *MongoStore) PublishStory(ctx context.Context, userID string, id string)
 		item.PublishedAt = &now
 	}
 	item.UpdatedAt = now
-	if _, err := m.stories.UpdateOne(ctx, bson.M{"id": id, "userId": userID}, bson.M{"$set": item}); err != nil {
+	if _, err := m.stories.UpdateOne(ctx, bson.M{"id": id, "userId": userID}, bson.M{"$set": visibilityUpdateSet(item.IsPublic, item.PublishedAt, item.UpdatedAt)}); err != nil {
 		return models.StorySetting{}, err
 	}
 	return item, nil
@@ -728,7 +764,7 @@ func (m *MongoStore) UnpublishStory(ctx context.Context, userID string, id strin
 	}
 	item.IsPublic = false
 	item.UpdatedAt = now
-	if _, err := m.stories.UpdateOne(ctx, bson.M{"id": id, "userId": userID}, bson.M{"$set": item}); err != nil {
+	if _, err := m.stories.UpdateOne(ctx, bson.M{"id": id, "userId": userID}, bson.M{"$set": visibilityUpdateSet(item.IsPublic, item.PublishedAt, item.UpdatedAt)}); err != nil {
 		return models.StorySetting{}, err
 	}
 	return item, nil
@@ -946,6 +982,14 @@ func (m *MongoStore) getPublicStory(ctx context.Context, id string) (models.Stor
 		return models.StorySetting{}, ErrNotFound
 	}
 	return item, err
+}
+
+func visibilityUpdateSet(isPublic bool, publishedAt *time.Time, updatedAt time.Time) bson.M {
+	return bson.M{
+		"isPublic":    isPublic,
+		"publishedAt": publishedAt,
+		"updatedAt":   updatedAt,
+	}
 }
 
 func findAll[T any](ctx context.Context, collection *mongo.Collection, filter any, out *[]T) error {

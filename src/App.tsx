@@ -464,6 +464,28 @@ export default function App() {
     return saved;
   };
 
+  const handleDeleteCharacter = async (id: string) => {
+    const ok = await apiService.deleteCharacter(id);
+    if (!ok) return false;
+    setBootstrap(prev => ({
+      ...prev,
+      characters: prev.characters.filter((item) => item.id !== id),
+      marketCharacters: prev.marketCharacters.filter((item) => item.id !== id),
+    }));
+    return true;
+  };
+
+  const handleDeleteStory = async (id: string) => {
+    const ok = await apiService.deleteStory(id);
+    if (!ok) return false;
+    setBootstrap(prev => ({
+      ...prev,
+      stories: prev.stories.filter((item) => item.id !== id),
+      marketStories: prev.marketStories.filter((item) => item.id !== id),
+    }));
+    return true;
+  };
+
   const handlePublishCharacter = async (id: string) => {
     const saved = await apiService.publishCharacter(id);
     setBootstrap(prev => ({
@@ -579,6 +601,8 @@ export default function App() {
             initialStories={bootstrap.stories}
             onSaveCharacter={handleSaveCharacter}
             onSaveStory={handleSaveStory}
+            onDeleteCharacter={handleDeleteCharacter}
+            onDeleteStory={handleDeleteStory}
             onPublishCharacter={handlePublishCharacter}
             onUnpublishCharacter={handleUnpublishCharacter}
             onPublishStory={handlePublishStory}

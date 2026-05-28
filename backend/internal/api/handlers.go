@@ -65,6 +65,15 @@ func (s *Server) handleCharacters(w http.ResponseWriter, r *http.Request, segmen
 	}
 
 	id := segments[1]
+	if len(segments) == 2 && r.Method == http.MethodDelete {
+		if err := s.repo.DeleteCharacter(r.Context(), currentUserID(r.Context()), id); err != nil {
+			writeError(w, statusFromError(err), err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
+
 	if len(segments) == 2 && r.Method == http.MethodPut {
 		var item models.Character
 		if err := decodeJSON(r, &item); err != nil {
@@ -139,6 +148,15 @@ func (s *Server) handleStories(w http.ResponseWriter, r *http.Request, segments 
 		default:
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
+		return
+	}
+
+	if len(segments) == 2 && r.Method == http.MethodDelete {
+		if err := s.repo.DeleteStory(r.Context(), currentUserID(r.Context()), segments[1]); err != nil {
+			writeError(w, statusFromError(err), err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
 

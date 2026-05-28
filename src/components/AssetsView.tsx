@@ -10,6 +10,8 @@ interface AssetsViewProps {
   initialStories: StorySetting[];
   onSaveCharacter: (character: Character) => Promise<Character>;
   onSaveStory: (story: StorySetting) => Promise<StorySetting>;
+  onDeleteCharacter: (id: string) => Promise<boolean>;
+  onDeleteStory: (id: string) => Promise<boolean>;
   onPublishCharacter: (id: string) => Promise<Character>;
   onUnpublishCharacter: (id: string) => Promise<Character>;
   onPublishStory: (id: string) => Promise<StorySetting>;
@@ -25,6 +27,7 @@ interface AssetsViewProps {
 type PublishableAsset = { isPublic?: boolean; publishedAt?: string };
 
 const isPublishedLocked = (asset: PublishableAsset) => Boolean(asset.isPublic || asset.publishedAt);
+const canDeleteAsset = (asset: PublishableAsset) => !asset.isPublic;
 
 const visibilityStatus = (asset: PublishableAsset) => {
   if (asset.isPublic) {
@@ -55,7 +58,7 @@ const visibilityConfirmText = (asset: PublishableAsset, title: string) => {
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : '操作失败';
 
-export const AssetsView: React.FC<AssetsViewProps> = ({ onBack, initialCharacters, initialStories, onSaveCharacter, onSaveStory, onPublishCharacter, onUnpublishCharacter, onPublishStory, onUnpublishStory, onParseCharacterFile, onGenerateCharacter, onGenerateCharacterImage, onGenerateStory, onGenerateStoryImage, onEditImage }) => {
+export const AssetsView: React.FC<AssetsViewProps> = ({ onBack, initialCharacters, initialStories, onSaveCharacter, onSaveStory, onDeleteCharacter, onDeleteStory, onPublishCharacter, onUnpublishCharacter, onPublishStory, onUnpublishStory, onParseCharacterFile, onGenerateCharacter, onGenerateCharacterImage, onGenerateStory, onGenerateStoryImage, onEditImage }) => {
   const [characters, setCharacters] = useState<Character[]>(initialCharacters);
   const [stories, setStories] = useState<StorySetting[]>(initialStories);
   const [saving, setSaving] = useState(false);
@@ -119,6 +122,54 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onBack, initialCharacter
     try {
       const saved = story.isPublic ? await onUnpublishStory(story.id) : await onPublishStory(story.id);
       setStories(prev => prev.map(item => item.id === saved.id ? saved : item));
+    } catch (error) {
+      setAssetError(errorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteCharacter = async (char: Character, event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!canDeleteAsset(char)) {
+      setAssetError('公开中的人物卡需要先下线后才能删除');
+      return;
+    }
+    if (!window.confirm(`确认删除人物卡《${char.name}》？该操作不可恢复。`)) return;
+    setSaving(true);
+    setAssetError('');
+    try {
+      const ok = await onDeleteCharacter(char.id);
+      if (!ok) {
+        setAssetError('删除人物卡失败，请稍后重试');
+        return;
+      }
+      setCharacters(prev => prev.filter(item => item.id !== char.id));
+      setActiveAsset(prev => prev?.type === 'character' && prev.data.id === char.id ? null : prev);
+    } catch (error) {
+      setAssetError(errorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteStory = async (story: StorySetting, event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!canDeleteAsset(story)) {
+      setAssetError('公开中的故事背景需要先下线后才能删除');
+      return;
+    }
+    if (!window.confirm(`确认删除故事背景《${story.title}》？该操作不可恢复。`)) return;
+    setSaving(true);
+    setAssetError('');
+    try {
+      const ok = await onDeleteStory(story.id);
+      if (!ok) {
+        setAssetError('删除故事背景失败，请稍后重试');
+        return;
+      }
+      setStories(prev => prev.filter(item => item.id !== story.id));
+      setActiveAsset(prev => prev?.type === 'story' && prev.data.id === story.id ? null : prev);
     } catch (error) {
       setAssetError(errorMessage(error));
     } finally {
@@ -201,7 +252,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onBack, initialCharacter
                              {!isPublishedLocked(char) && (
                                <button onClick={() => openAsset('character', char, 'edit')} className="p-1.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-300" title="编辑人设"><Edit3 size={14} /></button>
                              )}
-                             <button className="p-1.5 hover:bg-red-500/20 rounded text-zinc-500 hover:text-red-500" title="删除"><Trash2 size={14} /></button>
+                             {canDeleteAsset(char) && (
+                               <button type="button" onClick={(event) => handleDeleteCharacter(char, event)} disabled={saving} className="p-1.5 hover:bg-red-500/20 rounded text-zinc-500 hover:text-red-500 disabled:opacity-40" title="删除"><Trash2 size={14} /></button>
+                             )}
                           </div>
                        </div>
                        <p className="text-[11px] text-zinc-500 leading-relaxed mb-3 line-clamp-2">{char.description}</p>
@@ -266,9 +319,16 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onBack, initialCharacter
                             {setting.isPublic ? <ArchiveX size={10} /> : <Globe2 size={10} />}
                             {visibilityButtonLabel(setting)}
                           </button>
-                          <button className="text-[10px] text-zinc-400 hover:text-red-500 flex items-center gap-1">
-                             <Trash2 size={10} /> 删除
-                          </button>
+                          {canDeleteAsset(setting) && (
+                            <button
+                              type="button"
+                              onClick={(event) => handleDeleteStory(setting, event)}
+                              disabled={saving}
+                              className="text-[10px] text-zinc-400 hover:text-red-500 flex items-center gap-1 disabled:opacity-40"
+                            >
+                               <Trash2 size={10} /> 删除
+                            </button>
+                          )}
                        </div>
                     </div>
                   </div>

@@ -28,11 +28,13 @@ type Repository interface {
 	ListCharacters(context.Context, string, string) ([]models.Character, error)
 	SaveCharacter(context.Context, string, models.Character) (models.Character, error)
 	UpdateCharacter(context.Context, string, string, models.Character) (models.Character, error)
+	DeleteCharacter(context.Context, string, string) error
 	PublishCharacter(context.Context, string, string) (models.Character, error)
 	UnpublishCharacter(context.Context, string, string) (models.Character, error)
 	AcquireCharacter(context.Context, string, string) (models.Character, error)
 	ListStories(context.Context, string, string) ([]models.StorySetting, error)
 	SaveStory(context.Context, string, models.StorySetting) (models.StorySetting, error)
+	DeleteStory(context.Context, string, string) error
 	PublishStory(context.Context, string, string) (models.StorySetting, error)
 	UnpublishStory(context.Context, string, string) (models.StorySetting, error)
 	AcquireStory(context.Context, string, string) (models.StorySetting, error)

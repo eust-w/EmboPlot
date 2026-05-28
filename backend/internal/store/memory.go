@@ -390,6 +390,21 @@ func (m *MemoryStore) UpdateCharacter(_ context.Context, userID string, id strin
 	return item, nil
 }
 
+func (m *MemoryStore) DeleteCharacter(_ context.Context, userID string, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	existing, ok := m.characters[id]
+	if !ok || existing.UserID != userID {
+		return ErrNotFound
+	}
+	if existing.IsPublic {
+		return ErrPublishedLocked
+	}
+	delete(m.characters, id)
+	return nil
+}
+
 func (m *MemoryStore) PublishCharacter(_ context.Context, userID string, id string) (models.Character, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -501,6 +516,21 @@ func (m *MemoryStore) SaveStory(_ context.Context, userID string, item models.St
 	item.UpdatedAt = now
 	m.stories[item.ID] = item
 	return item, nil
+}
+
+func (m *MemoryStore) DeleteStory(_ context.Context, userID string, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	existing, ok := m.stories[id]
+	if !ok || existing.UserID != userID {
+		return ErrNotFound
+	}
+	if existing.IsPublic {
+		return ErrPublishedLocked
+	}
+	delete(m.stories, id)
+	return nil
 }
 
 func (m *MemoryStore) PublishStory(_ context.Context, userID string, id string) (models.StorySetting, error) {

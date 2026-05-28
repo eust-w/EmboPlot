@@ -619,6 +619,104 @@ func TestStoryPublishLocksFutureSavesAndCanBeUnpublished(t *testing.T) {
 	}
 }
 
+func TestPrivateAssetsCanBeDeleted(t *testing.T) {
+	server := api.NewServer(store.NewMemoryStore(), api.ServerOptions{})
+	cookie := registerTestUser(t, server, "asset-delete@example.com")
+	bootstrap := getBootstrap(t, server, cookie)
+	character := bootstrap.Characters[0]
+	story := bootstrap.Stories[0]
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/characters/"+character.ID, nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected character delete status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/api/stories/"+story.ID, nil)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected story delete status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	afterDelete := getBootstrap(t, server, cookie)
+	if containsCharacterID(afterDelete.Characters, character.ID) {
+		t.Fatalf("expected deleted character %q to disappear from workspace", character.ID)
+	}
+	if containsStoryID(afterDelete.Stories, story.ID) {
+		t.Fatalf("expected deleted story %q to disappear from workspace", story.ID)
+	}
+}
+
+func TestPublicAssetsCannotBeDeletedUntilDownlined(t *testing.T) {
+	server := api.NewServer(store.NewMemoryStore(), api.ServerOptions{})
+	cookie := registerTestUser(t, server, "asset-delete-public@example.com")
+	bootstrap := getBootstrap(t, server, cookie)
+	character := bootstrap.Characters[0]
+	story := bootstrap.Stories[0]
+
+	req := httptest.NewRequest(http.MethodPost, "/api/characters/"+character.ID+"/publish", nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected character publish status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodDelete, "/api/characters/"+character.ID, nil)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected public character delete status 409, got %d: %s", rec.Code, rec.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodPost, "/api/characters/"+character.ID+"/unpublish", nil)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected character unpublish status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodDelete, "/api/characters/"+character.ID, nil)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected downlined character delete status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/stories/"+story.ID+"/publish", nil)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected story publish status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodDelete, "/api/stories/"+story.ID, nil)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected public story delete status 409, got %d: %s", rec.Code, rec.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodPost, "/api/stories/"+story.ID+"/unpublish", nil)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected story unpublish status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodDelete, "/api/stories/"+story.ID, nil)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected downlined story delete status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestAcquireMarketAssetsCopiesPrivateEditableDrafts(t *testing.T) {
 	server := api.NewServer(store.NewMemoryStore(), api.ServerOptions{})
 	cookie := registerTestUser(t, server, "market-acquire@example.com")
@@ -901,6 +999,24 @@ func firstCookie(t *testing.T, rec *httptest.ResponseRecorder) *http.Cookie {
 func containsString(items []string, value string) bool {
 	for _, item := range items {
 		if item == value {
+			return true
+		}
+	}
+	return false
+}
+
+func containsCharacterID(items []models.Character, id string) bool {
+	for _, item := range items {
+		if item.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func containsStoryID(items []models.StorySetting, id string) bool {
+	for _, item := range items {
+		if item.ID == id {
 			return true
 		}
 	}
