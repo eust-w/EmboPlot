@@ -724,6 +724,31 @@ func (m *MemoryStore) AppendLine(_ context.Context, userID string, roomID string
 	return room, nil
 }
 
+func (m *MemoryStore) UpdateLineMedia(_ context.Context, userID string, roomID string, lineID string, imageURL *string, audioURL *string) (models.Room, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	room, ok := m.rooms[roomID]
+	if !ok || room.UserID != userID {
+		return models.Room{}, ErrNotFound
+	}
+	for index := range room.ScriptTimeline {
+		if room.ScriptTimeline[index].ID != lineID {
+			continue
+		}
+		if imageURL != nil {
+			room.ScriptTimeline[index].ImageURL = *imageURL
+		}
+		if audioURL != nil {
+			room.ScriptTimeline[index].AudioURL = *audioURL
+		}
+		room.UpdatedAt = time.Now().UTC()
+		m.rooms[roomID] = room
+		return room, nil
+	}
+	return models.Room{}, ErrNotFound
+}
+
 func (m *MemoryStore) GetProfile(_ context.Context, userID string) (models.Profile, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

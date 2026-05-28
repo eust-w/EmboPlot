@@ -908,6 +908,28 @@ func (m *MongoStore) AppendLine(ctx context.Context, userID string, roomID strin
 	return m.GetRoom(ctx, userID, roomID)
 }
 
+func (m *MongoStore) UpdateLineMedia(ctx context.Context, userID string, roomID string, lineID string, imageURL *string, audioURL *string) (models.Room, error) {
+	set := bson.M{"updatedAt": time.Now().UTC()}
+	if imageURL != nil {
+		set["scriptTimeline.$.imageUrl"] = *imageURL
+	}
+	if audioURL != nil {
+		set["scriptTimeline.$.audioUrl"] = *audioURL
+	}
+	result, err := m.rooms.UpdateOne(
+		ctx,
+		bson.M{"id": roomID, "userId": userID, "scriptTimeline.id": lineID},
+		bson.M{"$set": set},
+	)
+	if err != nil {
+		return models.Room{}, err
+	}
+	if result.MatchedCount == 0 {
+		return models.Room{}, ErrNotFound
+	}
+	return m.GetRoom(ctx, userID, roomID)
+}
+
 func (m *MongoStore) GetProfile(ctx context.Context, userID string) (models.Profile, error) {
 	var profile models.Profile
 	err := m.profiles.FindOne(ctx, bson.M{"userId": userID}).Decode(&profile)

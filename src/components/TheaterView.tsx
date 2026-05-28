@@ -7,6 +7,8 @@ import { modelService } from '@/src/services/modelService';
 import { useMediaQuery } from '@/src/hooks/useMediaQuery';
 import TypewriterText from './TypewriterText';
 
+type ScriptLineMediaPatch = Partial<Pick<TheaterState['scriptTimeline'][number], 'imageUrl' | 'audioUrl'>>;
+
 interface TheaterViewProps {
   state: TheaterState;
   setState: React.Dispatch<React.SetStateAction<TheaterState>>;
@@ -22,6 +24,7 @@ interface TheaterViewProps {
   libraryCharacters: Character[];
   libraryStories: StorySetting[];
   persistRoomState: (state: TheaterState) => void;
+  persistScriptLinePatch: (lineId: string, patch: ScriptLineMediaPatch) => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   theaterRef: React.RefObject<HTMLDivElement | null>;
   onBack: () => void;
@@ -38,7 +41,7 @@ interface TheaterViewProps {
 }
 
 export const TheaterView: React.FC<TheaterViewProps> = (props) => {
-  const { state, setState, input, setInput, showMentions, setShowMentions, sidebarOpen, setSidebarOpen, activeTab, setActiveTab, setIsCreatorOpen, libraryCharacters, libraryStories, persistRoomState, scrollRef, theaterRef, onBack, handleSend, generateNext, handleExport, exportingFormat, speechTarget, setSpeechTarget, voicePlaybackBusy, setVoicePlaybackBusy, voiceBacklogCount, setVoiceBacklogCount } = props;
+  const { state, setState, input, setInput, showMentions, setShowMentions, sidebarOpen, setSidebarOpen, activeTab, setActiveTab, setIsCreatorOpen, libraryCharacters, libraryStories, persistRoomState, persistScriptLinePatch, scrollRef, theaterRef, onBack, handleSend, generateNext, handleExport, exportingFormat, speechTarget, setSpeechTarget, voicePlaybackBusy, setVoicePlaybackBusy, voiceBacklogCount, setVoiceBacklogCount } = props;
 
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
   const [generatingVoices, setGeneratingVoices] = useState<Set<string>>(new Set());
@@ -59,6 +62,14 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
   const speechTargetValue = speechTarget.type === 'character' && speechTarget.characterId ? `character:${speechTarget.characterId}` : speechTarget.type;
   const engineStatus = state.engine.isGenerating ? '生成中' : voicePlaybackBusy ? '播报中' : state.engine.autoPilot ? '自动推演' : '已暂停';
 
+  const applyScriptLinePatch = (lineId: string, patch: ScriptLineMediaPatch) => {
+    setState(prev => ({
+      ...prev,
+      scriptTimeline: prev.scriptTimeline.map(line => line.id === lineId ? { ...line, ...patch } : line)
+    }));
+    persistScriptLinePatch(lineId, patch);
+  };
+
   useEffect(() => {
     if (isMobile) {
       setSidebarOpen(false);
@@ -74,10 +85,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
       const prompt = `A cinematic visualize for a script scene. Context: ${state.stage.currentStory.description}. Script line: "${line.content}". Character: ${line.name || 'Narrator'}. Style: epic concept art.`;
       const imageUrl = await modelService.generateImage(prompt);
 
-      setState(prev => ({
-        ...prev,
-        scriptTimeline: prev.scriptTimeline.map(l => l.id === lineId ? { ...l, imageUrl } : l)
-      }));
+      applyScriptLinePatch(lineId, { imageUrl });
     } catch (error) {
       const message = error instanceof Error ? error.message : '未知错误';
       alert(`图片生成失败：${message}`);
@@ -115,10 +123,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
         lines: selectedLines,
       });
       const targetLineId = selectedLines[selectedLines.length - 1].id;
-      setState(prev => ({
-        ...prev,
-        scriptTimeline: prev.scriptTimeline.map(line => line.id === targetLineId ? { ...line, imageUrl } : line)
-      }));
+      applyScriptLinePatch(targetLineId, { imageUrl });
       setSelectedLineIds(new Set());
     } catch (error) {
       const message = error instanceof Error ? error.message : '未知错误';
@@ -199,10 +204,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
     const promise = modelService.generateSpeech(line.content, voiceNameForLine(line))
       .then((audioUrl) => {
         voiceCacheRef.current.set(line.id, { audioUrl });
-        setState(prev => ({
-          ...prev,
-          scriptTimeline: prev.scriptTimeline.map(l => l.id === line.id ? { ...l, audioUrl } : l)
-        }));
+        applyScriptLinePatch(line.id, { audioUrl });
         return audioUrl;
       })
       .catch((error) => {

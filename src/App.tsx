@@ -54,6 +54,8 @@ const isRecentDuplicateScriptContent = (content: string, timeline: ScriptLine[])
   return timeline.slice(-8).some((line) => normalizeScriptContentForRepeat(line.content) === normalized);
 };
 
+type ScriptLineMediaPatch = Partial<Pick<ScriptLine, 'imageUrl' | 'audioUrl'>>;
+
 const initialState = (): TheaterState => ({
   view: 'rooms',
   gameSettings: {
@@ -99,6 +101,15 @@ export default function App() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const theaterRef = useRef<HTMLDivElement>(null);
   const generationInFlightRef = useRef(false);
+
+  const replaceBootstrapRoom = (room: Room) => {
+    setBootstrap(prev => ({
+      ...prev,
+      rooms: prev.rooms.some((item) => item.id === room.id)
+        ? prev.rooms.map((item) => item.id === room.id ? room : item)
+        : [room, ...prev.rooms],
+    }));
+  };
 
   const loadBootstrap = async () => {
     const data = await apiService.getBootstrap();
@@ -258,10 +269,15 @@ export default function App() {
 
     setState(prev => ({
       ...prev,
-      scriptTimeline: nextTimeline
+      scriptTimeline: [...prev.scriptTimeline, addressedLine]
     }));
     setInput('');
-    void apiService.appendScriptLine(state.roomInfo.id, addressedLine);
+    const existingRoom = bootstrap.rooms.find((room) => room.id === state.roomInfo.id);
+    const optimisticRoom = roomFromState({ ...state, scriptTimeline: nextTimeline }, existingRoom);
+    replaceBootstrapRoom(optimisticRoom);
+    void apiService.appendScriptLine(state.roomInfo.id, addressedLine).then((saved) => {
+      if (saved) replaceBootstrapRoom(saved);
+    });
   };
 
   const generateNext = async (historyOverride?: ScriptLine[]) => {
@@ -283,16 +299,20 @@ export default function App() {
         content: newLineData.content || ''
       };
 
-      setState(prev => {
-        if (isRecentDuplicateScriptContent(newLine.content, prev.scriptTimeline)) {
-          console.warn('Blocked duplicate generated script line:', newLine.content);
-          return { ...prev, engine: { ...prev.engine, autoPilot: false } };
-        }
-        return {
-          ...prev,
-          scriptTimeline: [...prev.scriptTimeline, newLine],
-        };
-      });
+      if (isRecentDuplicateScriptContent(newLine.content, state.scriptTimeline)) {
+        console.warn('Blocked duplicate generated script line:', newLine.content);
+        setState(prev => ({ ...prev, engine: { ...prev.engine, autoPilot: false } }));
+        return;
+      }
+
+      const nextTimeline = [...state.scriptTimeline, newLine];
+      const persistedRoom = roomFromState({ ...state, scriptTimeline: nextTimeline }, existingRoom);
+      replaceBootstrapRoom(persistedRoom);
+      setState(prev => ({
+        ...prev,
+        scriptTimeline: [...prev.scriptTimeline, newLine],
+      }));
+      void apiService.updateRoom(persistedRoom).then((saved) => replaceBootstrapRoom(saved));
     } catch (error) {
       console.error(error);
       setState(prev => ({ ...prev, engine: { ...prev.engine, autoPilot: false } }));
@@ -416,6 +436,15 @@ export default function App() {
     } catch (error) {
       console.error('Failed to persist room roster:', error);
     }
+  };
+
+  const persistScriptLinePatch = async (lineId: string, patch: ScriptLineMediaPatch) => {
+    const nextTimeline = state.scriptTimeline.map((line) => line.id === lineId ? { ...line, ...patch } : line);
+    const existingRoom = bootstrap.rooms.find((room) => room.id === state.roomInfo.id);
+    replaceBootstrapRoom(roomFromState({ ...state, scriptTimeline: nextTimeline }, existingRoom));
+
+    const saved = await apiService.patchScriptLine(state.roomInfo.id, lineId, patch);
+    if (saved) replaceBootstrapRoom(saved);
   };
 
   const handleDeleteRoom = async (roomId: string) => {
@@ -655,6 +684,7 @@ export default function App() {
             libraryCharacters={bootstrap.characters}
             libraryStories={bootstrap.stories}
             persistRoomState={persistCurrentRoomState}
+            persistScriptLinePatch={persistScriptLinePatch}
             scrollRef={scrollRef}
             theaterRef={theaterRef}
             onBack={() => setState(prev => ({ ...prev, view: 'rooms' }))}

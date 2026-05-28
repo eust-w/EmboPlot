@@ -295,6 +295,28 @@ func (s *Server) handleRooms(w http.ResponseWriter, r *http.Request, segments []
 		return
 	}
 
+	if len(segments) == 4 && segments[2] == "lines" && r.Method == http.MethodPatch {
+		var req struct {
+			ImageURL *string `json:"imageUrl"`
+			AudioURL *string `json:"audioUrl"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if req.ImageURL == nil && req.AudioURL == nil {
+			writeError(w, http.StatusBadRequest, "imageUrl or audioUrl is required")
+			return
+		}
+		room, err := s.repo.UpdateLineMedia(r.Context(), currentUserID(r.Context()), roomID, segments[3], req.ImageURL, req.AudioURL)
+		if err != nil {
+			writeError(w, statusFromError(err), err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, room)
+		return
+	}
+
 	if len(segments) == 3 && segments[2] == "generate" && r.Method == http.MethodPost {
 		room, err := s.repo.GetRoom(r.Context(), currentUserID(r.Context()), roomID)
 		if err != nil {

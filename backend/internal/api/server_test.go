@@ -473,6 +473,89 @@ func TestRoomCRUD(t *testing.T) {
 	}
 }
 
+func TestRoomLineMediaPatchPersistsTimeline(t *testing.T) {
+	server := api.NewServer(store.NewMemoryStore(), api.ServerOptions{ModelGateway: fakeGateway{}})
+	cookie := registerTestUser(t, server, "room-line-media@example.com")
+	bootstrap := getBootstrap(t, server, cookie)
+	room := bootstrap.Rooms[0]
+	if len(room.ScriptTimeline) == 0 {
+		t.Fatal("expected seeded room to have a script line")
+	}
+
+	extraLine := models.ScriptLine{
+		ID:      "line_extra",
+		Type:    models.LogTypeCharacter,
+		Name:    "林深",
+		Content: "后续台词必须保留。",
+	}
+	payload, err := json.Marshal(extraLine)
+	if err != nil {
+		t.Fatalf("marshal line: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/lines", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected append status 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var roomWithExtra models.Room
+	if err := json.Unmarshal(rec.Body.Bytes(), &roomWithExtra); err != nil {
+		t.Fatalf("decode appended room: %v", err)
+	}
+
+	patchPayload := strings.NewReader(`{"imageUrl":"https://example.com/scene.png","audioUrl":"https://example.com/voice.wav"}`)
+	req = httptest.NewRequest(http.MethodPatch, "/api/rooms/"+room.ID+"/lines/"+room.ScriptTimeline[0].ID, patchPayload)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected patch status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var updated models.Room
+	if err := json.Unmarshal(rec.Body.Bytes(), &updated); err != nil {
+		t.Fatalf("decode patched room: %v", err)
+	}
+	if len(updated.ScriptTimeline) != len(roomWithExtra.ScriptTimeline) {
+		t.Fatalf("expected timeline length %d, got %d", len(roomWithExtra.ScriptTimeline), len(updated.ScriptTimeline))
+	}
+
+	var sawMedia bool
+	var sawExtra bool
+	for _, line := range updated.ScriptTimeline {
+		if line.ID == room.ScriptTimeline[0].ID {
+			sawMedia = line.ImageURL == "https://example.com/scene.png" && line.AudioURL == "https://example.com/voice.wav"
+		}
+		if line.ID == extraLine.ID && line.Content == extraLine.Content {
+			sawExtra = true
+		}
+	}
+	if !sawMedia {
+		t.Fatalf("expected patched media to be present, got %+v", updated.ScriptTimeline)
+	}
+	if !sawExtra {
+		t.Fatalf("expected existing extra line to remain, got %+v", updated.ScriptTimeline)
+	}
+
+	persisted := getBootstrap(t, server, cookie)
+	var sawPersisted bool
+	for _, item := range persisted.Rooms {
+		if item.ID != room.ID {
+			continue
+		}
+		for _, line := range item.ScriptTimeline {
+			if line.ID == room.ScriptTimeline[0].ID && line.ImageURL != "" && line.AudioURL != "" {
+				sawPersisted = true
+			}
+		}
+	}
+	if !sawPersisted {
+		t.Fatalf("expected patched media to persist through bootstrap, got %+v", persisted.Rooms)
+	}
+}
+
 func TestCharacterPublishLocksFutureEditsAndCanBeUnpublished(t *testing.T) {
 	server := api.NewServer(store.NewMemoryStore(), api.ServerOptions{})
 	cookie := registerTestUser(t, server, "character-publish@example.com")

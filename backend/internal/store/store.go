@@ -45,6 +45,7 @@ type Repository interface {
 	UpdateRoom(context.Context, string, string, models.Room) (models.Room, error)
 	DeleteRoom(context.Context, string, string) error
 	AppendLine(context.Context, string, string, models.ScriptLine) (models.Room, error)
+	UpdateLineMedia(context.Context, string, string, string, *string, *string) (models.Room, error)
 	GetProfile(context.Context, string) (models.Profile, error)
 	UpdateProfile(context.Context, string, models.Profile) (models.Profile, error)
 }

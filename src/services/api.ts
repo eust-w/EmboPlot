@@ -245,6 +245,17 @@ export const apiService = {
     }
   },
 
+  async patchScriptLine(roomId: string, lineId: string, patch: Partial<Pick<ScriptLine, 'imageUrl' | 'audioUrl'>>): Promise<Room | null> {
+    try {
+      return await request<Room>(`/api/rooms/${roomId}/lines/${encodeURIComponent(lineId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      });
+    } catch {
+      return null;
+    }
+  },
+
   async generateNextScriptLine(roomId: string, room: Room): Promise<ScriptLine> {
     try {
       return await request<ScriptLine>(`/api/rooms/${roomId}/generate`, {
