@@ -321,16 +321,29 @@ func (s *Server) handleRooms(w http.ResponseWriter, r *http.Request, segments []
 				room.GameSettings = req.GameSettings
 			}
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason: chargeReason("script_generate"),
+			Points: pointsScriptGenerate,
+			Metadata: chargeMetadata(r.URL.Path, map[string]string{
+				"roomId": roomID,
+			}),
+		})
+		if !ok {
+			return
+		}
 		line, err := s.modelGateway.GenerateScriptLine(r.Context(), room)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
 		line = normalizeLine(line)
 		if _, err := s.repo.AppendLine(r.Context(), currentUserID(r.Context()), roomID, line); err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, line)
 		return
 	}
@@ -475,11 +488,23 @@ func (s *Server) handleOnboarding(w http.ResponseWriter, r *http.Request, segmen
 	defer file.Close()
 
 	content, _ := io.ReadAll(io.LimitReader(file, 64*1024))
+	finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+		Reason: chargeReason("character_parse"),
+		Points: pointsCharacterParse,
+		Metadata: chargeMetadata(r.URL.Path, map[string]string{
+			"filename": header.Filename,
+		}),
+	})
+	if !ok {
+		return
+	}
 	parsed, err := s.modelGateway.ParseCharacter(r.Context(), header.Filename, string(content))
 	if err != nil {
+		finalizeCharge(err)
 		writeError(w, statusFromError(err), err.Error())
 		return
 	}
+	finalizeCharge(nil)
 	writeJSON(w, http.StatusOK, parsed)
 }
 

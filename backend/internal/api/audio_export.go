@@ -59,6 +59,17 @@ func (s *Server) handleAudioExport(w http.ResponseWriter, r *http.Request) {
 		voiceByCharacterID[character.ID] = character.VoiceName
 	}
 
+	finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+		Reason: chargeReason("audio_export"),
+		Points: audioExportPoints(payload.ScriptTimeline),
+		Metadata: chargeMetadata(r.URL.Path, map[string]string{
+			"lines": fmt.Sprintf("%d", len(payload.ScriptTimeline)),
+		}),
+	})
+	if !ok {
+		return
+	}
+
 	segments := make([]wavSegment, 0, len(payload.ScriptTimeline))
 	for _, line := range payload.ScriptTimeline {
 		text := speechTextForExportLine(line)
@@ -69,6 +80,7 @@ func (s *Server) handleAudioExport(w http.ResponseWriter, r *http.Request) {
 		if audioURL == "" {
 			result, err := s.modelGateway.GenerateSpeech(r.Context(), text, voiceForExportLine(line, voiceByCharacterID))
 			if err != nil {
+				finalizeCharge(err)
 				writeError(w, statusFromError(err), err.Error())
 				return
 			}
@@ -76,11 +88,13 @@ func (s *Server) handleAudioExport(w http.ResponseWriter, r *http.Request) {
 		}
 		rawAudio, err := loadExportAudio(r, audioURL)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, http.StatusBadGateway, err.Error())
 			return
 		}
 		segment, err := parseWAV(rawAudio)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, http.StatusBadGateway, err.Error())
 			return
 		}
@@ -88,16 +102,19 @@ func (s *Server) handleAudioExport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(segments) == 0 {
+		finalizeCharge(fmt.Errorf("no speakable lines"))
 		writeError(w, http.StatusBadRequest, "scriptTimeline must contain at least one speakable line")
 		return
 	}
 
 	audio, err := concatenateWAVSegments(segments, audioExportPauseMilliseconds)
 	if err != nil {
+		finalizeCharge(err)
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
 
+	finalizeCharge(nil)
 	filename := exportAudioFilename(payload.Title)
 	w.Header().Set("Content-Type", "audio/wav")
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))

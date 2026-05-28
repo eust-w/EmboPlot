@@ -134,6 +134,16 @@ type User struct {
 	LastLoginAt  time.Time `bson:"lastLoginAt,omitempty" json:"lastLoginAt,omitempty"`
 }
 
+type PointTransaction struct {
+	ID           string            `bson:"id" json:"id"`
+	UserID       string            `bson:"userId" json:"userId"`
+	Delta        int               `bson:"delta" json:"delta"`
+	BalanceAfter int               `bson:"balanceAfter" json:"balanceAfter"`
+	Reason       string            `bson:"reason" json:"reason"`
+	Metadata     map[string]string `bson:"metadata,omitempty" json:"metadata,omitempty"`
+	CreatedAt    time.Time         `bson:"createdAt" json:"createdAt"`
+}
+
 type PublicUser struct {
 	ID          string    `json:"id"`
 	Email       string    `json:"email"`

@@ -140,6 +140,20 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const handlePointsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ points?: number }>).detail;
+      if (typeof detail?.points !== 'number') return;
+      setBootstrap(prev => ({
+        ...prev,
+        profile: { ...prev.profile, points: detail.points },
+      }));
+      setAuthUser(prev => prev ? { ...prev, points: detail.points } : prev);
+    };
+    window.addEventListener('emboplot:points-updated', handlePointsUpdated);
+    return () => window.removeEventListener('emboplot:points-updated', handlePointsUpdated);
+  }, []);
+
+  useEffect(() => {
     if (scrollRef.current) {
        scrollRef.current.scrollTo({
          top: scrollRef.current.scrollHeight,

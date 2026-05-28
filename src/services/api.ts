@@ -2,6 +2,7 @@ import { LogType, type AuthResponse, type AuthSessionResponse, type AuthUser, ty
 import { MOCK_CHARACTERS, MOCK_MARKET_CHARACTERS, MOCK_STORY_SETTINGS, mockService } from '@/src/mockData';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const POINTS_UPDATED_EVENT = 'emboplot:points-updated';
 
 class ApiError extends Error {
   status: number;
@@ -41,7 +42,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     throw new ApiError(response.status, await errorMessageFromResponse(response));
   }
+  emitPointsUpdate(response);
   return response.json() as Promise<T>;
+}
+
+function emitPointsUpdate(response: Response) {
+  const remaining = response.headers.get('X-Points-Remaining');
+  if (remaining === null || typeof window === 'undefined') return;
+  const points = Number(remaining);
+  if (!Number.isFinite(points)) return;
+  const charged = Number(response.headers.get('X-Points-Charged') || '0');
+  window.dispatchEvent(new CustomEvent(POINTS_UPDATED_EVENT, {
+    detail: {
+      points,
+      charged: Number.isFinite(charged) ? charged : 0,
+      reason: response.headers.get('X-Points-Reason') || '',
+    },
+  }));
 }
 
 function fallbackProfile(): Profile {
@@ -324,7 +341,8 @@ export const apiService = {
         method: 'POST',
         body: form,
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
       const content = file.type.includes('text') ? await file.text() : '';
       return {
         id: `char_${Date.now()}`,
@@ -450,6 +468,7 @@ export const apiService = {
     if (!response.ok) {
       throw new ApiError(response.status, await errorMessageFromResponse(response));
     }
+    emitPointsUpdate(response);
     return response.blob();
   },
 

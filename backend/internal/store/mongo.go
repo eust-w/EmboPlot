@@ -21,6 +21,7 @@ type MongoStore struct {
 	assets     *mongo.Collection
 	rooms      *mongo.Collection
 	profiles   *mongo.Collection
+	points     *mongo.Collection
 }
 
 func NewMongoStore(ctx context.Context, uri string, database string) (*MongoStore, error) {
@@ -42,6 +43,7 @@ func NewMongoStore(ctx context.Context, uri string, database string) (*MongoStor
 		assets:     db.Collection("assets"),
 		rooms:      db.Collection("rooms"),
 		profiles:   db.Collection("profiles"),
+		points:     db.Collection("point_transactions"),
 	}, nil
 }
 
@@ -156,6 +158,7 @@ func (m *MongoStore) ensureIndexes(ctx context.Context) error {
 		{m.assets, mongo.IndexModel{Keys: bson.D{{Key: "userId", Value: 1}}}},
 		{m.rooms, mongo.IndexModel{Keys: bson.D{{Key: "userId", Value: 1}}}},
 		{m.profiles, mongo.IndexModel{Keys: bson.D{{Key: "userId", Value: 1}}, Options: options.Index().SetUnique(true)}},
+		{m.points, mongo.IndexModel{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "createdAt", Value: -1}}}},
 	}
 	for _, item := range indexes {
 		if _, err := item.collection.Indexes().CreateOne(ctx, item.model); err != nil {
@@ -283,6 +286,86 @@ func (m *MongoStore) UpdateUser(ctx context.Context, user models.User) (models.U
 		return models.User{}, ErrNotFound
 	}
 	return user, nil
+}
+
+func (m *MongoStore) DebitPoints(ctx context.Context, userID string, amount int, reason string, metadata map[string]string) (models.Profile, error) {
+	if amount <= 0 {
+		return m.GetProfile(ctx, userID)
+	}
+	now := time.Now().UTC()
+	var user models.User
+	err := m.users.FindOneAndUpdate(
+		ctx,
+		bson.M{"id": userID, "points": bson.M{"$gte": amount}},
+		bson.M{
+			"$inc": bson.M{"points": -amount},
+			"$set": bson.M{"updatedAt": now},
+		},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&user)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		if _, lookupErr := m.GetUserByID(ctx, userID); lookupErr != nil {
+			return models.Profile{}, lookupErr
+		}
+		return models.Profile{}, ErrInsufficientPoints
+	}
+	if err != nil {
+		return models.Profile{}, err
+	}
+	return m.syncPointProfileAndRecord(ctx, user, -amount, reason, metadata, now)
+}
+
+func (m *MongoStore) CreditPoints(ctx context.Context, userID string, amount int, reason string, metadata map[string]string) (models.Profile, error) {
+	if amount <= 0 {
+		return m.GetProfile(ctx, userID)
+	}
+	now := time.Now().UTC()
+	var user models.User
+	err := m.users.FindOneAndUpdate(
+		ctx,
+		bson.M{"id": userID},
+		bson.M{
+			"$inc": bson.M{"points": amount},
+			"$set": bson.M{"updatedAt": now},
+		},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&user)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return models.Profile{}, ErrNotFound
+	}
+	if err != nil {
+		return models.Profile{}, err
+	}
+	return m.syncPointProfileAndRecord(ctx, user, amount, reason, metadata, now)
+}
+
+func (m *MongoStore) syncPointProfileAndRecord(ctx context.Context, user models.User, delta int, reason string, metadata map[string]string, now time.Time) (models.Profile, error) {
+	var profile models.Profile
+	err := m.profiles.FindOneAndUpdate(
+		ctx,
+		bson.M{"userId": user.ID},
+		bson.M{"$set": bson.M{"points": user.Points, "updatedAt": now}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&profile)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return models.Profile{}, ErrNotFound
+	}
+	if err != nil {
+		return models.Profile{}, err
+	}
+	transaction := models.PointTransaction{
+		ID:           NewID("ptx"),
+		UserID:       user.ID,
+		Delta:        delta,
+		BalanceAfter: user.Points,
+		Reason:       reason,
+		Metadata:     cloneMetadata(metadata),
+		CreatedAt:    now,
+	}
+	if _, err := m.points.InsertOne(ctx, transaction); err != nil {
+		return models.Profile{}, err
+	}
+	return profile, nil
 }
 
 func (m *MongoStore) Bootstrap(ctx context.Context, userID string) (models.Bootstrap, error) {

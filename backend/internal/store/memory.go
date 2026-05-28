@@ -17,6 +17,7 @@ type MemoryStore struct {
 	stories    map[string]models.StorySetting
 	assets     map[string]models.Asset
 	rooms      map[string]models.Room
+	points     map[string]models.PointTransaction
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -28,6 +29,7 @@ func NewMemoryStore() *MemoryStore {
 		stories:    make(map[string]models.StorySetting),
 		assets:     make(map[string]models.Asset),
 		rooms:      make(map[string]models.Room),
+		points:     make(map[string]models.PointTransaction),
 	}
 	for _, item := range append(seed.Characters, seed.MarketCharacters...) {
 		store.characters[item.ID] = item
@@ -118,6 +120,70 @@ func (m *MemoryStore) UpdateUser(_ context.Context, user models.User) (models.Us
 	user.UpdatedAt = time.Now().UTC()
 	m.users[user.ID] = user
 	return user, nil
+}
+
+func (m *MemoryStore) DebitPoints(_ context.Context, userID string, amount int, reason string, metadata map[string]string) (models.Profile, error) {
+	if amount <= 0 {
+		return m.GetProfile(context.Background(), userID)
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	user, ok := m.users[userID]
+	if !ok {
+		return models.Profile{}, ErrNotFound
+	}
+	profile, ok := m.profiles[userID]
+	if !ok {
+		return models.Profile{}, ErrNotFound
+	}
+	if user.Points < amount || profile.Points < amount {
+		return models.Profile{}, ErrInsufficientPoints
+	}
+	user.Points -= amount
+	user.UpdatedAt = time.Now().UTC()
+	profile.Points = user.Points
+	profile.UpdatedAt = user.UpdatedAt
+	m.users[userID] = user
+	m.profiles[userID] = profile
+	m.recordPointTransaction(userID, -amount, user.Points, reason, metadata, user.UpdatedAt)
+	return profile, nil
+}
+
+func (m *MemoryStore) CreditPoints(_ context.Context, userID string, amount int, reason string, metadata map[string]string) (models.Profile, error) {
+	if amount <= 0 {
+		return m.GetProfile(context.Background(), userID)
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	user, ok := m.users[userID]
+	if !ok {
+		return models.Profile{}, ErrNotFound
+	}
+	profile, ok := m.profiles[userID]
+	if !ok {
+		return models.Profile{}, ErrNotFound
+	}
+	user.Points += amount
+	user.UpdatedAt = time.Now().UTC()
+	profile.Points = user.Points
+	profile.UpdatedAt = user.UpdatedAt
+	m.users[userID] = user
+	m.profiles[userID] = profile
+	m.recordPointTransaction(userID, amount, user.Points, reason, metadata, user.UpdatedAt)
+	return profile, nil
+}
+
+func (m *MemoryStore) recordPointTransaction(userID string, delta int, balanceAfter int, reason string, metadata map[string]string, now time.Time) {
+	transaction := models.PointTransaction{
+		ID:           NewID("ptx"),
+		UserID:       userID,
+		Delta:        delta,
+		BalanceAfter: balanceAfter,
+		Reason:       reason,
+		Metadata:     cloneMetadata(metadata),
+		CreatedAt:    now,
+	}
+	m.points[transaction.ID] = transaction
 }
 
 func (m *MemoryStore) Bootstrap(ctx context.Context, userID string) (models.Bootstrap, error) {

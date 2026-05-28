@@ -10,6 +10,7 @@ import (
 var ErrNotFound = errors.New("not found")
 var ErrDuplicate = errors.New("duplicate")
 var ErrPublishedLocked = errors.New("published assets cannot be modified")
+var ErrInsufficientPoints = errors.New("insufficient points")
 
 type Repository interface {
 	EnsureSeed(context.Context) error
@@ -17,6 +18,8 @@ type Repository interface {
 	GetUserByEmail(context.Context, string) (models.User, error)
 	GetUserByID(context.Context, string) (models.User, error)
 	UpdateUser(context.Context, models.User) (models.User, error)
+	DebitPoints(context.Context, string, int, string, map[string]string) (models.Profile, error)
+	CreditPoints(context.Context, string, int, string, map[string]string) (models.Profile, error)
 	Bootstrap(context.Context, string) (models.Bootstrap, error)
 	ListCharacters(context.Context, string, string) ([]models.Character, error)
 	SaveCharacter(context.Context, string, models.Character) (models.Character, error)

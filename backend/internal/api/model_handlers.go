@@ -34,11 +34,21 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request, segments [
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason:   chargeReason("image_generate"),
+			Points:   pointsImageGenerate,
+			Metadata: chargeMetadata(r.URL.Path, nil),
+		})
+		if !ok {
+			return
+		}
 		result, err := s.modelGateway.GenerateImage(r.Context(), req.Prompt)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, result)
 	case "character":
 		if r.Method != http.MethodPost {
@@ -50,11 +60,21 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request, segments [
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason:   chargeReason("character_generate"),
+			Points:   pointsCharacterDraft,
+			Metadata: chargeMetadata(r.URL.Path, nil),
+		})
+		if !ok {
+			return
+		}
 		result, err := s.modelGateway.GenerateCharacter(r.Context(), req)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, result)
 	case "story":
 		if r.Method != http.MethodPost {
@@ -66,11 +86,21 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request, segments [
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason:   chargeReason("story_generate"),
+			Points:   pointsStoryDraft,
+			Metadata: chargeMetadata(r.URL.Path, nil),
+		})
+		if !ok {
+			return
+		}
 		result, err := s.modelGateway.GenerateStory(r.Context(), req)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, result)
 	case "character-image":
 		if r.Method != http.MethodPost {
@@ -88,11 +118,21 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request, segments [
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason:   chargeReason("character_image"),
+			Points:   pointsImageGenerate,
+			Metadata: chargeMetadata(r.URL.Path, nil),
+		})
+		if !ok {
+			return
+		}
 		result, err := s.modelGateway.GenerateImage(r.Context(), characterImagePrompt(req.Name, req.Description, req.Personality, req.Memory, req.Prompt))
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, result)
 	case "story-image":
 		if r.Method != http.MethodPost {
@@ -110,11 +150,21 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request, segments [
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason:   chargeReason("story_image"),
+			Points:   pointsImageGenerate,
+			Metadata: chargeMetadata(r.URL.Path, nil),
+		})
+		if !ok {
+			return
+		}
 		result, err := s.modelGateway.GenerateImage(r.Context(), storyImagePrompt(req.Title, req.Description, req.Content, req.Tags, req.Prompt))
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, result)
 	case "image-edit":
 		if r.Method != http.MethodPost {
@@ -126,11 +176,21 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request, segments [
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason:   chargeReason("image_edit"),
+			Points:   pointsImageEdit,
+			Metadata: chargeMetadata(r.URL.Path, nil),
+		})
+		if !ok {
+			return
+		}
 		result, err := s.modelGateway.EditImage(r.Context(), req)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, result)
 	case "scene-image":
 		if r.Method != http.MethodPost {
@@ -153,11 +213,21 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request, segments [
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason:   chargeReason("scene_image"),
+			Points:   pointsImageGenerate,
+			Metadata: chargeMetadata(r.URL.Path, map[string]string{"lines": fmt.Sprintf("%d", len(req.Lines))}),
+		})
+		if !ok {
+			return
+		}
 		result, err := s.modelGateway.GenerateImage(r.Context(), prompt)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, result)
 	case "speech":
 		if r.Method != http.MethodPost {
@@ -172,11 +242,21 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request, segments [
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason:   chargeReason("speech"),
+			Points:   speechPoints(req.Text),
+			Metadata: chargeMetadata(r.URL.Path, nil),
+		})
+		if !ok {
+			return
+		}
 		result, err := s.modelGateway.GenerateSpeech(r.Context(), req.Text, req.VoiceName)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, result)
 	case "transcribe":
 		if r.Method != http.MethodPost {
@@ -191,11 +271,21 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request, segments [
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason:   chargeReason("transcribe"),
+			Points:   pointsTranscribe,
+			Metadata: chargeMetadata(r.URL.Path, nil),
+		})
+		if !ok {
+			return
+		}
 		result, err := s.modelGateway.TranscribeAudio(r.Context(), req.AudioData, req.Language)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, result)
 	case "embed":
 		if r.Method != http.MethodPost {
@@ -209,11 +299,21 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request, segments [
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason:   chargeReason("embed"),
+			Points:   embedPoints(req.Texts),
+			Metadata: chargeMetadata(r.URL.Path, map[string]string{"texts": fmt.Sprintf("%d", len(req.Texts))}),
+		})
+		if !ok {
+			return
+		}
 		result, err := s.modelGateway.Embed(r.Context(), req.Texts)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, result)
 	case "moderate":
 		if r.Method != http.MethodPost {
@@ -227,11 +327,21 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request, segments [
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason:   chargeReason("moderate"),
+			Points:   pointsModerate,
+			Metadata: chargeMetadata(r.URL.Path, nil),
+		})
+		if !ok {
+			return
+		}
 		result, err := s.modelGateway.Moderate(r.Context(), req.Text)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, result)
 	case "vision":
 		if r.Method != http.MethodPost {
@@ -246,11 +356,21 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request, segments [
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		finalizeCharge, ok := s.reserveAICharge(w, r, aiCharge{
+			Reason:   chargeReason("vision"),
+			Points:   pointsVision,
+			Metadata: chargeMetadata(r.URL.Path, nil),
+		})
+		if !ok {
+			return
+		}
 		result, err := s.modelGateway.AnalyzeImage(r.Context(), req.ImageURL, req.Prompt)
 		if err != nil {
+			finalizeCharge(err)
 			writeError(w, statusFromError(err), err.Error())
 			return
 		}
+		finalizeCharge(nil)
 		writeJSON(w, http.StatusOK, result)
 	default:
 		writeError(w, http.StatusNotFound, "route not found")
