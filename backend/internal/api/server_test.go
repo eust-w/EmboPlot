@@ -333,6 +333,28 @@ func (continuityGateway) GenerateScriptLine(_ context.Context, room models.Room)
 	}, nil
 }
 
+type rosterGateway struct {
+	fakeGateway
+	seenCharacterIDs []string
+}
+
+func (g *rosterGateway) GenerateScriptLine(_ context.Context, room models.Room) (models.ScriptLine, error) {
+	g.seenCharacterIDs = g.seenCharacterIDs[:0]
+	for _, character := range room.ActiveChars {
+		g.seenCharacterIDs = append(g.seenCharacterIDs, character.ID)
+	}
+	return models.ScriptLine{
+		ID:          "roster_line",
+		Type:        models.LogTypeCharacter,
+		CharacterID: "char_added",
+		Name:        "新加入者",
+		TargetType:  "everyone",
+		TargetName:  "对大家",
+		Content:     "我也在场。",
+		CreatedAt:   1,
+	}, nil
+}
+
 func TestGenerateLineUsesRequestTimelineForContinuity(t *testing.T) {
 	server := api.NewServer(store.NewMemoryStore(), api.ServerOptions{ModelGateway: continuityGateway{}})
 	cookie := registerTestUser(t, server, "room-continuity@example.com")
@@ -363,6 +385,46 @@ func TestGenerateLineUsesRequestTimelineForContinuity(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "刚才门铃坏了") {
 		t.Fatalf("expected generation to use request timeline, got %s", rec.Body.String())
+	}
+}
+
+func TestGenerateLineUsesRequestActiveCharacters(t *testing.T) {
+	gateway := &rosterGateway{}
+	server := api.NewServer(store.NewMemoryStore(), api.ServerOptions{ModelGateway: gateway})
+	cookie := registerTestUser(t, server, "room-roster@example.com")
+	bootstrap := getBootstrap(t, server, cookie)
+	room := bootstrap.Rooms[0]
+
+	added := models.Character{
+		ID:          "char_added",
+		Name:        "新加入者",
+		Avatar:      "https://example.com/added.png",
+		Description: "刚加入剧本的人物",
+		Status:      "idle",
+		VoiceName:   "Kore",
+	}
+	payload, err := json.Marshal(map[string]any{
+		"scriptTimeline":   room.ScriptTimeline,
+		"activeCharacters": append(room.ActiveChars, added),
+	})
+	if err != nil {
+		t.Fatalf("marshal generate payload: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/generate", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !containsString(gateway.seenCharacterIDs, "char_added") {
+		t.Fatalf("expected model gateway to receive added character, got %v", gateway.seenCharacterIDs)
+	}
+	if !strings.Contains(rec.Body.String(), "新加入者") {
+		t.Fatalf("expected generated line to allow added character, got %s", rec.Body.String())
 	}
 }
 
@@ -834,6 +896,15 @@ func firstCookie(t *testing.T, rec *httptest.ResponseRecorder) *http.Cookie {
 		t.Fatalf("expected response cookie, got none: %s", rec.Body.String())
 	}
 	return cookies[0]
+}
+
+func containsString(items []string, value string) bool {
+	for _, item := range items {
+		if item == value {
+			return true
+		}
+	}
+	return false
 }
 
 func getBootstrap(t *testing.T, server *api.Server, cookie *http.Cookie) models.Bootstrap {

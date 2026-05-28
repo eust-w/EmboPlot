@@ -55,6 +55,31 @@ func TestScriptPromptRequiresDialogueTargetSchema(t *testing.T) {
 	}
 }
 
+func TestScriptPromptMarksActiveCharactersWithoutRecentPresence(t *testing.T) {
+	prompt := scriptPrompt(models.Room{
+		CurrentStory: models.StorySetting{Title: "青涩的回响", Description: "雨夜便利店"},
+		ActiveChars: []models.Character{
+			{ID: "char_a", Name: "林深"},
+			{ID: "char_added", Name: "新加入者"},
+		},
+		ScriptTimeline: []models.ScriptLine{
+			{Type: models.LogTypeCharacter, CharacterID: "char_a", Name: "林深", Content: "你听见了吗？"},
+		},
+	})
+	var payload struct {
+		SilentActiveCharacters []string `json:"silentActiveCharacters"`
+	}
+	if err := json.Unmarshal([]byte(prompt), &payload); err != nil {
+		t.Fatalf("decode prompt payload: %v", err)
+	}
+	if len(payload.SilentActiveCharacters) != 1 || payload.SilentActiveCharacters[0] != "新加入者" {
+		t.Fatalf("expected newly active character to be marked silent, got %+v", payload.SilentActiveCharacters)
+	}
+	if !strings.Contains(prompt, "silentActiveCharacters") || !strings.Contains(prompt, "让其自然回应") {
+		t.Fatalf("expected prompt to instruct model to include silent active characters, got %s", prompt)
+	}
+}
+
 func TestScriptPromptUsesExpandedContinuityWindowAndWorldRules(t *testing.T) {
 	lines := make([]models.ScriptLine, 25)
 	for i := range lines {

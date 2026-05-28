@@ -219,14 +219,20 @@ export const apiService = {
     }
   },
 
-  async generateNextScriptLine(roomId: string, history: ScriptLine[]): Promise<ScriptLine> {
+  async generateNextScriptLine(roomId: string, room: Room): Promise<ScriptLine> {
     try {
       return await request<ScriptLine>(`/api/rooms/${roomId}/generate`, {
         method: 'POST',
-        body: JSON.stringify({ scriptTimeline: history }),
+        body: JSON.stringify({
+          scriptTimeline: room.scriptTimeline,
+          activeCharacters: room.activeCharacters,
+          characterIds: room.characterIds,
+          currentStory: room.currentStory,
+          gameSettings: room.gameSettings,
+        }),
       });
     } catch {
-      const line = await mockService.fetchNextScriptLine(history);
+      const line = await mockService.fetchNextScriptLine(room.scriptTimeline);
       return {
         id: line.id || Math.random().toString(36).slice(2),
         type: (line.type as LogType) || LogType.DIRECTOR,

@@ -30,6 +30,21 @@ const stateFromRoom = (room: Room): TheaterState => ({
   },
 });
 
+const roomFromState = (snapshot: TheaterState, existing?: Room): Room => ({
+  id: snapshot.roomInfo.id,
+  userId: existing?.userId,
+  title: snapshot.roomInfo.title,
+  storyId: snapshot.stage.currentStory.id,
+  characterIds: snapshot.stage.activeCharacters.map((char) => char.id),
+  currentStory: snapshot.stage.currentStory,
+  activeCharacters: snapshot.stage.activeCharacters,
+  gameSettings: snapshot.gameSettings,
+  scriptTimeline: snapshot.scriptTimeline,
+  status: existing?.status || 'running',
+  createdAt: existing?.createdAt,
+  updatedAt: existing?.updatedAt,
+});
+
 const initialState = (): TheaterState => ({
   view: 'rooms',
   gameSettings: {
@@ -202,7 +217,12 @@ export default function App() {
     setState(prev => ({ ...prev, engine: { ...prev.engine, isGenerating: true } }));
 
     try {
-      const newLineData = await apiService.generateNextScriptLine(state.roomInfo.id, historyOverride || state.scriptTimeline);
+      const existingRoom = bootstrap.rooms.find((room) => room.id === state.roomInfo.id);
+      const roomSnapshot = roomFromState({
+        ...state,
+        scriptTimeline: historyOverride || state.scriptTimeline,
+      }, existingRoom);
+      const newLineData = await apiService.generateNextScriptLine(state.roomInfo.id, roomSnapshot);
       const newLine: ScriptLine = {
         id: Math.random().toString(),
         type: newLineData.type as LogType,
@@ -315,6 +335,26 @@ export default function App() {
       scriptTimeline: saved.scriptTimeline,
     } : prev);
     return saved;
+  };
+
+  const persistCurrentRoomState = async (snapshot: TheaterState) => {
+    const existingRoom = bootstrap.rooms.find((room) => room.id === snapshot.roomInfo.id);
+    const room = roomFromState(snapshot, existingRoom);
+    setBootstrap(prev => ({
+      ...prev,
+      rooms: prev.rooms.some((item) => item.id === room.id)
+        ? prev.rooms.map((item) => item.id === room.id ? room : item)
+        : [room, ...prev.rooms],
+    }));
+    try {
+      const saved = await apiService.updateRoom(room);
+      setBootstrap(prev => ({
+        ...prev,
+        rooms: prev.rooms.map((item) => item.id === saved.id ? saved : item),
+      }));
+    } catch (error) {
+      console.error('Failed to persist room roster:', error);
+    }
   };
 
   const handleDeleteRoom = async (roomId: string) => {
@@ -517,6 +557,7 @@ export default function App() {
             setIsCreatorOpen={setIsCreatorOpen}
             libraryCharacters={bootstrap.characters}
             libraryStories={bootstrap.stories}
+            persistRoomState={persistCurrentRoomState}
             scrollRef={scrollRef}
             theaterRef={theaterRef}
             onBack={() => setState(prev => ({ ...prev, view: 'rooms' }))}

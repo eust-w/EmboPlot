@@ -284,7 +284,11 @@ func (s *Server) handleRooms(w http.ResponseWriter, r *http.Request, segments []
 			return
 		}
 		var req struct {
-			ScriptTimeline []models.ScriptLine `json:"scriptTimeline"`
+			ScriptTimeline   []models.ScriptLine `json:"scriptTimeline"`
+			ActiveCharacters []models.Character  `json:"activeCharacters"`
+			CharacterIDs     []string            `json:"characterIds"`
+			CurrentStory     models.StorySetting `json:"currentStory"`
+			GameSettings     models.GameSettings `json:"gameSettings"`
 		}
 		if r.Body != nil && r.Body != http.NoBody && r.ContentLength != 0 {
 			if err := decodeJSON(r, &req); err != nil {
@@ -296,6 +300,25 @@ func (s *Server) handleRooms(w http.ResponseWriter, r *http.Request, segments []
 				for _, item := range req.ScriptTimeline {
 					room.ScriptTimeline = append(room.ScriptTimeline, normalizeLine(item))
 				}
+			}
+			if len(req.ActiveCharacters) > 0 {
+				room.ActiveChars = req.ActiveCharacters
+				room.CharacterIDs = req.CharacterIDs
+				if len(room.CharacterIDs) == 0 {
+					room.CharacterIDs = make([]string, 0, len(req.ActiveCharacters))
+					for _, character := range req.ActiveCharacters {
+						if character.ID != "" {
+							room.CharacterIDs = append(room.CharacterIDs, character.ID)
+						}
+					}
+				}
+			}
+			if req.CurrentStory.ID != "" {
+				room.CurrentStory = req.CurrentStory
+				room.StoryID = req.CurrentStory.ID
+			}
+			if req.GameSettings.Language != "" {
+				room.GameSettings = req.GameSettings
 			}
 		}
 		line, err := s.modelGateway.GenerateScriptLine(r.Context(), room)

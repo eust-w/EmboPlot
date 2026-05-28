@@ -21,6 +21,7 @@ interface TheaterViewProps {
   setIsCreatorOpen: (val: boolean) => void;
   libraryCharacters: Character[];
   libraryStories: StorySetting[];
+  persistRoomState: (state: TheaterState) => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   theaterRef: React.RefObject<HTMLDivElement | null>;
   onBack: () => void;
@@ -37,7 +38,7 @@ interface TheaterViewProps {
 }
 
 export const TheaterView: React.FC<TheaterViewProps> = (props) => {
-  const { state, setState, input, setInput, showMentions, setShowMentions, sidebarOpen, setSidebarOpen, activeTab, setActiveTab, setIsCreatorOpen, libraryCharacters, libraryStories, scrollRef, theaterRef, onBack, handleSend, generateNext, handleExport, exportingFormat, speechTarget, setSpeechTarget, voicePlaybackBusy, setVoicePlaybackBusy, voiceBacklogCount, setVoiceBacklogCount } = props;
+  const { state, setState, input, setInput, showMentions, setShowMentions, sidebarOpen, setSidebarOpen, activeTab, setActiveTab, setIsCreatorOpen, libraryCharacters, libraryStories, persistRoomState, scrollRef, theaterRef, onBack, handleSend, generateNext, handleExport, exportingFormat, speechTarget, setSpeechTarget, voicePlaybackBusy, setVoicePlaybackBusy, voiceBacklogCount, setVoiceBacklogCount } = props;
 
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
   const [generatingVoices, setGeneratingVoices] = useState<Set<string>>(new Set());
@@ -412,12 +413,19 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
                             status: 'idle'
                         };
                         setState(prev => ({
-                            ...prev,
-                            stage: {
-                                ...prev.stage,
-                                activeCharacters: [...prev.stage.activeCharacters, newPlayer]
-                            }
+                          ...prev,
+                          stage: {
+                            ...prev.stage,
+                            activeCharacters: [...prev.stage.activeCharacters, newPlayer]
+                          }
                         }));
+                        persistRoomState({
+                          ...state,
+                          stage: {
+                            ...state.stage,
+                            activeCharacters: [...state.stage.activeCharacters, newPlayer]
+                          }
+                        });
                     }}
                     className="text-zinc-500 hover:text-blue-400 transition-colors"
                     title="真人加入"
@@ -440,15 +448,18 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
                   <div
                     key={char.id}
                     onClick={() => {
-                        const isAlreadyActive = state.stage.activeCharacters.some(c => c.id === char.id);
-                        if (!isAlreadyActive) {
-                            setState(prev => ({
-                                ...prev,
-                                stage: {
-                                    ...prev.stage,
-                                    activeCharacters: [...prev.stage.activeCharacters, char]
-                                }
-                            }));
+                        const nextState = state.stage.activeCharacters.some(c => c.id === char.id)
+                          ? state
+                          : {
+                              ...state,
+                              stage: {
+                                ...state.stage,
+                                activeCharacters: [...state.stage.activeCharacters, char]
+                              }
+                            };
+                        if (nextState !== state) {
+                          setState(nextState);
+                          persistRoomState(nextState);
                         }
                         setInput(input + `@${char.name} `);
                     }}
@@ -465,7 +476,11 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
                 libraryStories.map(story => (
                   <div
                     key={story.id}
-                    onClick={() => setState(prev => ({ ...prev, stage: { ...prev.stage, currentStory: story } }))}
+                    onClick={() => {
+                      const nextState = { ...state, stage: { ...state.stage, currentStory: story } };
+                      setState(nextState);
+                      persistRoomState(nextState);
+                    }}
                     className="group relative h-24 rounded-xl overflow-hidden cursor-pointer border border-transparent hover:border-amber-500 transition-all"
                   >
                     <img src={story.coverImage} alt={story.title} className="w-full h-full object-cover transition-transform group-hover:scale-110" />

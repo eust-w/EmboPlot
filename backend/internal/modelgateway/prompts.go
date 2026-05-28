@@ -36,15 +36,16 @@ func scriptPrompt(room models.Room) string {
 	}
 	recent := room.ScriptTimeline[start:]
 	payload := map[string]any{
-		"story":               room.CurrentStory,
-		"currentStory":        room.CurrentStory,
-		"contextWindowLines":  timelineContextLimit,
-		"continuityFactLines": continuityFactLimit,
-		"gameSettings":        room.GameSettings,
-		"activeCharacters":    briefs,
-		"recentTimeline":      recent,
-		"mustUseContinuity":   continuityFacts(recent),
-		"requiredNextType":    requiredNextType(recent),
+		"story":                  room.CurrentStory,
+		"currentStory":           room.CurrentStory,
+		"contextWindowLines":     timelineContextLimit,
+		"continuityFactLines":    continuityFactLimit,
+		"gameSettings":           room.GameSettings,
+		"activeCharacters":       briefs,
+		"silentActiveCharacters": silentActiveCharacters(room.ActiveChars, recent),
+		"recentTimeline":         recent,
+		"mustUseContinuity":      continuityFacts(recent),
+		"requiredNextType":       requiredNextType(recent),
 		"contextPolicy": []string{
 			"currentStory 是唯一世界观来源；不要引入未在 currentStory、activeCharacters、recentTimeline 或用户指令中出现的阵营、地点、能力体系或专有名词。",
 			"recentTimeline 是当前现场状态；下一句必须继承最后一次明确出现的地点、道具、伤势、情绪、关系和物理变化。",
@@ -58,6 +59,7 @@ func scriptPrompt(room models.Room) string {
 			"角色台词必须体现各自 personality 和 memory，不要所有人说同一种语气。",
 			"当 type=character 时必须明确说话对象：targetType 只能是 character/everyone/self/air；character 表示对某个角色说话，everyone 表示对大家说话，self 表示自言自语，air 表示对空气/无人回应处说话。",
 			"如果上一句直接点名或质问某个角色，下一句优先让被点名者回应，或让发话者继续对同一对象说话；不要让角色关系断裂。",
+			"如果 silentActiveCharacters 非空，说明这些已上场角色最近没有说话或未被提及；接下来优先用导演旁白确认其在场，或让其他角色对其发问，再让其自然回应。",
 			"每 2-4 句角色对白之间应穿插导演旁白或场面调度，说明环境、动作、沉默、视线、物件或节奏变化。",
 			"避免重复同一个词头、口癖或省略号；除非角色设定要求，不要连续多句以同样标点开头。",
 			"不要输出解释，不要输出 Markdown，只输出一个 JSON 对象。",
@@ -75,6 +77,26 @@ func scriptPrompt(room models.Room) string {
 	}
 	data, _ := json.Marshal(payload)
 	return string(data)
+}
+
+func silentActiveCharacters(characters []models.Character, lines []models.ScriptLine) []string {
+	seen := make(map[string]bool, len(characters))
+	for _, line := range lines {
+		if line.CharacterID != "" {
+			seen[line.CharacterID] = true
+		}
+		if line.TargetID != "" {
+			seen[line.TargetID] = true
+		}
+	}
+	silent := make([]string, 0, len(characters))
+	for _, character := range characters {
+		if character.ID == "" || seen[character.ID] {
+			continue
+		}
+		silent = append(silent, character.Name)
+	}
+	return silent
 }
 
 func requiredNextType(lines []models.ScriptLine) string {
