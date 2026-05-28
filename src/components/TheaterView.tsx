@@ -26,7 +26,8 @@ interface TheaterViewProps {
   onBack: () => void;
   handleSend: () => void;
   generateNext: () => void;
-  handleExport: (format: 'png' | 'md') => void;
+  handleExport: (format: 'png' | 'md' | 'audio') => void;
+  exportingFormat: 'png' | 'md' | 'audio' | null;
   speechTarget: SpeechTarget;
   setSpeechTarget: (target: SpeechTarget) => void;
   voicePlaybackBusy: boolean;
@@ -36,7 +37,7 @@ interface TheaterViewProps {
 }
 
 export const TheaterView: React.FC<TheaterViewProps> = (props) => {
-  const { state, setState, input, setInput, showMentions, setShowMentions, sidebarOpen, setSidebarOpen, activeTab, setActiveTab, setIsCreatorOpen, libraryCharacters, libraryStories, scrollRef, theaterRef, onBack, handleSend, generateNext, handleExport, speechTarget, setSpeechTarget, voicePlaybackBusy, setVoicePlaybackBusy, voiceBacklogCount, setVoiceBacklogCount } = props;
+  const { state, setState, input, setInput, showMentions, setShowMentions, sidebarOpen, setSidebarOpen, activeTab, setActiveTab, setIsCreatorOpen, libraryCharacters, libraryStories, scrollRef, theaterRef, onBack, handleSend, generateNext, handleExport, exportingFormat, speechTarget, setSpeechTarget, voicePlaybackBusy, setVoicePlaybackBusy, voiceBacklogCount, setVoiceBacklogCount } = props;
 
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
   const [generatingVoices, setGeneratingVoices] = useState<Set<string>>(new Set());
@@ -503,20 +504,32 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
              <div className="flex items-center bg-zinc-800 rounded-full p-1 border border-white/5 scale-90 lg:scale-100">
                <button
                 onClick={() => handleExport('png')}
+                disabled={!!exportingFormat}
                 aria-label="导出 PNG 长图"
-                className="px-3 lg:px-4 py-1.5 hover:bg-zinc-700 rounded-full text-[10px] lg:text-xs font-bold transition-all flex items-center gap-2"
+                className="px-3 lg:px-4 py-1.5 hover:bg-zinc-700 rounded-full text-[10px] lg:text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-40"
                 title="导出长图"
                >
-                  <Download size={14} /> PNG
+                  {exportingFormat === 'png' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} PNG
                </button>
                <div className="w-[1px] h-4 bg-white/10 mx-1" />
                <button
                 onClick={() => handleExport('md')}
+                disabled={!!exportingFormat}
                 aria-label="导出 Markdown 剧本"
-                className="px-3 lg:px-4 py-1.5 hover:bg-zinc-700 rounded-full text-[10px] lg:text-xs font-bold transition-all flex items-center gap-2"
+                className="px-3 lg:px-4 py-1.5 hover:bg-zinc-700 rounded-full text-[10px] lg:text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-40"
                 title="导出剧本"
                >
-                  <Download size={14} /> MD
+                  {exportingFormat === 'md' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} MD
+               </button>
+               <div className="w-[1px] h-4 bg-white/10 mx-1" />
+               <button
+                onClick={() => handleExport('audio')}
+                disabled={!!exportingFormat}
+                aria-label="导出完整音频"
+                className="px-3 lg:px-4 py-1.5 hover:bg-zinc-700 rounded-full text-[10px] lg:text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-40"
+                title="导出完整音频"
+               >
+                  {exportingFormat === 'audio' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} WAV
                </button>
              </div>
           </div>

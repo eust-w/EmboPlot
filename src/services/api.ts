@@ -432,6 +432,19 @@ export const apiService = {
     }
   },
 
+  async exportAudio(title: string, scriptTimeline: ScriptLine[], activeCharacters: Character[]): Promise<Blob> {
+    const response = await fetch(`${API_BASE}/api/exports/audio`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, scriptTimeline, activeCharacters }),
+    });
+    if (!response.ok) {
+      throw new ApiError(response.status, await errorMessageFromResponse(response));
+    }
+    return response.blob();
+  },
+
   async getModelCapabilities(): Promise<ModelCapabilities | null> {
     try {
       return await request<ModelCapabilities>('/api/models/capabilities');

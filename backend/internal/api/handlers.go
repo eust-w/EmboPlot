@@ -461,7 +461,15 @@ func (s *Server) handleOnboarding(w http.ResponseWriter, r *http.Request, segmen
 }
 
 func (s *Server) handleExports(w http.ResponseWriter, r *http.Request, segments []string) {
-	if len(segments) != 2 || segments[1] != "markdown" {
+	if len(segments) != 2 {
+		writeError(w, http.StatusNotFound, "route not found")
+		return
+	}
+	if segments[1] == "audio" {
+		s.handleAudioExport(w, r)
+		return
+	}
+	if segments[1] != "markdown" {
 		writeError(w, http.StatusNotFound, "route not found")
 		return
 	}

@@ -65,6 +65,7 @@ export default function App() {
   const [speechTarget, setSpeechTarget] = useState<SpeechTarget>({ type: 'everyone' });
   const [voicePlaybackBusy, setVoicePlaybackBusy] = useState(false);
   const [voiceBacklogCount, setVoiceBacklogCount] = useState(0);
+  const [exportingFormat, setExportingFormat] = useState<'png' | 'md' | 'audio' | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile sidebar toggle
   const [activeTab, setActiveTab] = useState<AssetCategory>('character');
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
@@ -230,22 +231,35 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [state.view, state.engine.autoPilot, state.engine.isGenerating, state.scriptTimeline.length, state.gameSettings.pace, voiceBacklogCount]);
 
-  const handleExport = async (format: 'png' | 'md' = 'png') => {
-    if (format === 'md') {
-      const content = await apiService.exportMarkdown(state.roomInfo.title, state.scriptTimeline);
-
-      const blob = new Blob([content], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `script-${state.roomInfo.title}-${Date.now()}.md`;
-      link.click();
-      URL.revokeObjectURL(url);
-      return;
-    }
-
-    if (!theaterRef.current) return;
+  const handleExport = async (format: 'png' | 'md' | 'audio' = 'png') => {
+    if (exportingFormat) return;
+    setExportingFormat(format);
     try {
+      if (format === 'md') {
+        const content = await apiService.exportMarkdown(state.roomInfo.title, state.scriptTimeline);
+
+        const blob = new Blob([content], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `script-${state.roomInfo.title}-${Date.now()}.md`;
+        link.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      if (format === 'audio') {
+        const blob = await apiService.exportAudio(state.roomInfo.title, state.scriptTimeline, state.stage.activeCharacters);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `script-${state.roomInfo.title}-${Date.now()}.wav`;
+        link.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      if (!theaterRef.current) return;
       const dataUrl = await domToPng(theaterRef.current, { backgroundColor: '#09090b', scale: 2 });
       const link = document.createElement('a');
       link.download = `emboplot-script-${Date.now()}.png`;
@@ -253,6 +267,9 @@ export default function App() {
       link.click();
     } catch (err) {
       console.error('Export failed', err);
+      alert(format === 'audio' ? '音频导出失败，请稍后重试' : '导出失败，请稍后重试');
+    } finally {
+      setExportingFormat(null);
     }
   };
 
@@ -506,6 +523,7 @@ export default function App() {
             handleSend={handleSend}
             generateNext={generateNext}
             handleExport={handleExport}
+            exportingFormat={exportingFormat}
             speechTarget={speechTarget}
             setSpeechTarget={setSpeechTarget}
             voicePlaybackBusy={voicePlaybackBusy}

@@ -776,6 +776,43 @@ func TestModelCapabilityRoutes(t *testing.T) {
 	}
 }
 
+func TestExportAudioRendersWholeScriptAsWAV(t *testing.T) {
+	server := api.NewServer(store.NewMemoryStore(), api.ServerOptions{})
+	cookie := registerTestUser(t, server, "audio-export@example.com")
+
+	body := strings.NewReader(`{
+		"title":"雨夜便利店",
+		"activeCharacters":[{"id":"char_a","name":"林深","voiceName":"Kore"}],
+		"scriptTimeline":[
+			{"id":"1","type":"director","content":"雨水敲在便利店的玻璃门上。"},
+			{"id":"2","type":"character","characterId":"char_a","name":"林深","action":"压低声音","content":"有人跟着我。"},
+			{"id":"3","type":"user","content":"导演要求：镜头推进到柜台。"}
+		]
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/exports/audio", body)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if contentType := rec.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "audio/wav") {
+		t.Fatalf("expected audio/wav content type, got %q", contentType)
+	}
+	if disposition := rec.Header().Get("Content-Disposition"); !strings.Contains(disposition, ".wav") {
+		t.Fatalf("expected wav attachment disposition, got %q", disposition)
+	}
+	payload := rec.Body.Bytes()
+	if len(payload) <= 44 {
+		t.Fatalf("expected non-empty wav payload, got %d bytes", len(payload))
+	}
+	if string(payload[:4]) != "RIFF" || string(payload[8:12]) != "WAVE" {
+		t.Fatalf("expected RIFF/WAVE payload header, got %q / %q", string(payload[:4]), string(payload[8:12]))
+	}
+}
+
 func registerTestUser(t *testing.T, server *api.Server, email string) *http.Cookie {
 	t.Helper()
 
