@@ -74,4 +74,4 @@ done
 
 curl -fsS "$PUBLIC_URL/api/models/capabilities" >/dev/null
 
-echo "Deployed EmboPlot to $PUBLIC_URL"
+echo "Deployed 随流剧场 to $PUBLIC_URL"

@@ -318,7 +318,7 @@ func (c PaymentConfig) publicURL(path string) string {
 }
 
 func paymentTitle(plan RechargePlan) string {
-	return fmt.Sprintf("EmboPlot %d 剧情币", plan.Points)
+	return fmt.Sprintf("随流剧场 %d 剧情币", plan.Points)
 }
 
 func sanitizePaymentTitle(value string) string {
@@ -332,7 +332,7 @@ func sanitizePaymentTitle(value string) string {
 	}
 	trimmed := strings.TrimSpace(out.String())
 	if trimmed == "" {
-		return "EmboPlot 剧情币"
+		return "随流剧场 剧情币"
 	}
 	runes := []rune(trimmed)
 	if len(runes) > 42 {

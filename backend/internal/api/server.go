@@ -69,7 +69,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	segments := apiSegments(r.URL.Path)
 	if len(segments) == 0 {
-		writeJSON(w, http.StatusOK, map[string]any{"name": "EmboPlot API", "ok": true})
+		writeJSON(w, http.StatusOK, map[string]any{"name": "随流剧场 API", "ok": true})
 		return
 	}
 

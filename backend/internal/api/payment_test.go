@@ -149,7 +149,7 @@ func TestHupijiaoNotifyCreditsPointsOnce(t *testing.T) {
 		"total_fee":      {"49.00"},
 		"transaction_id": {"wx_tx_123"},
 		"open_order_id":  {"hupijiao_123"},
-		"order_title":    {"EmboPlot 500 剧情币"},
+		"order_title":    {"随流剧场 500 剧情币"},
 		"status":         {"OD"},
 		"appid":          {"test_app"},
 		"time":           {"1779950000"},
@@ -197,7 +197,7 @@ func createTestPaymentOrder(t *testing.T, repo *store.MemoryStore, email string,
 		PlanID:       planID,
 		Points:       500,
 		AmountCents:  4900,
-		Title:        "EmboPlot 500 剧情币",
+		Title:        "随流剧场 500 剧情币",
 		Status:       "pending",
 	}
 	saved, err := repo.SavePaymentOrder(reqCtx(), user.ID, order)

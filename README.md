@@ -1,12 +1,6 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
-
-# EmboPlot
+# 随流剧场
 
 互动式多角色剧场 demo。当前仓库包含 Vite/React 前端，以及 Go + MongoDB 后端 API。
-
-View your app in AI Studio: https://ai.studio/apps/de8c2df8-ac5e-4846-90de-c9914697af3d
 
 ## Run Locally
 

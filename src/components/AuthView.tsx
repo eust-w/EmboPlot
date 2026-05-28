@@ -45,8 +45,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onRegister, onAuthe
               <Sparkles size={22} className="text-zinc-950" />
             </div>
             <div>
-              <p className="text-xl font-black italic tracking-tighter">PARALLEL</p>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-[0.24em] font-mono">Theater Engine</p>
+              <p className="text-xl font-black tracking-tight">随流剧场</p>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-[0.24em] font-mono">Story Engine</p>
             </div>
           </div>
 

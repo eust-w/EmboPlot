@@ -44,7 +44,7 @@ func (g *BailianGateway) Capabilities() Capabilities {
 
 func (g *BailianGateway) GenerateScriptLine(ctx context.Context, room models.Room) (models.ScriptLine, error) {
 	payload := map[string]any{}
-	system := "你是 EmboPlot 的多智能体剧场推演引擎，负责连续剧本、导演旁白和角色反应。严格承接最近剧情事实，不跳戏，不重置场景。只输出 JSON，不要 Markdown。"
+	system := "你是随流剧场的多智能体剧场推演引擎，负责连续剧本、导演旁白和角色反应。严格承接最近剧情事实，不跳戏，不重置场景。只输出 JSON，不要 Markdown。"
 	user := scriptPrompt(room)
 	content, err := g.chat(ctx, g.cfg.ChatModel, []chatMessage{
 		{Role: "system", Content: system},
@@ -154,7 +154,7 @@ func findCharacter(active []models.Character, id string, name string) models.Cha
 }
 
 func (g *BailianGateway) ParseCharacter(ctx context.Context, filename string, content string) (models.Character, error) {
-	prompt := fmt.Sprintf(`请把上传的人物资料解析为 EmboPlot 角色卡 JSON。
+	prompt := fmt.Sprintf(`请把上传的人物资料解析为随流剧场角色卡 JSON。
 文件名：%s
 正文：
 %s
@@ -203,7 +203,7 @@ func (g *BailianGateway) GenerateCharacter(ctx context.Context, req CharacterDra
 		return models.Character{}, errors.New("character prompt is required")
 	}
 	modelOutput, err := g.chat(ctx, g.cfg.ParseModel, []chatMessage{
-		{Role: "system", Content: "你是 EmboPlot 的资深角色卡编剧。只输出 JSON，不要 Markdown。"},
+		{Role: "system", Content: "你是随流剧场的资深角色卡编剧。只输出 JSON，不要 Markdown。"},
 		{Role: "user", Content: prompt},
 	}, 0.45, true)
 	if err != nil {
@@ -243,7 +243,7 @@ func (g *BailianGateway) GenerateStory(ctx context.Context, req StoryDraftReques
 		return models.StorySetting{}, errors.New("story prompt is required")
 	}
 	modelOutput, err := g.chat(ctx, g.cfg.ParseModel, []chatMessage{
-		{Role: "system", Content: "你是 EmboPlot 的资深故事背景编剧。只输出 JSON，不要 Markdown。"},
+		{Role: "system", Content: "你是随流剧场的资深故事背景编剧。只输出 JSON，不要 Markdown。"},
 		{Role: "user", Content: prompt},
 	}, 0.45, true)
 	if err != nil {

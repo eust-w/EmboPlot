@@ -28,8 +28,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, isO
             <Monitor size={24} className="text-zinc-950" />
           </div>
           <div>
-            <h2 className="text-lg lg:text-xl font-black italic tracking-tighter">PARALLEL</h2>
-            <p className="text-[8px] lg:text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Theater Engine</p>
+            <h2 className="text-lg lg:text-xl font-black tracking-tight">随流剧场</h2>
+            <p className="text-[8px] lg:text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Story Engine</p>
           </div>
         </div>
         {onToggle && (

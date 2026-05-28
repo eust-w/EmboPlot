@@ -51,7 +51,7 @@ func main() {
 	})
 
 	addr := ":" + cfg.Port
-	logger.Info("EmboPlot API listening", "addr", addr, "database", cfg.MongoDatabase, "models", modelgateway.DebugSummary(cfg.ModelGateway))
+	logger.Info("随流剧场 API listening", "addr", addr, "database", cfg.MongoDatabase, "models", modelgateway.DebugSummary(cfg.ModelGateway))
 	if err := http.ListenAndServe(addr, server); err != nil {
 		log.Fatal(err)
 	}
