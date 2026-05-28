@@ -4,15 +4,24 @@ import { MOCK_CHARACTERS, MOCK_MARKET_CHARACTERS, MOCK_STORY_SETTINGS, mockServi
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const POINTS_UPDATED_EVENT = 'emboplot:points-updated';
 
-class ApiError extends Error {
+export class ApiError extends Error {
   status: number;
+  pointsRequired?: number;
+  pointsRemaining?: number;
+  pointsReason?: string;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, meta?: { pointsRequired?: number; pointsRemaining?: number; pointsReason?: string }) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.pointsRequired = meta?.pointsRequired;
+    this.pointsRemaining = meta?.pointsRemaining;
+    this.pointsReason = meta?.pointsReason;
   }
 }
+
+export const isInsufficientPointsError = (error: unknown): error is ApiError =>
+  error instanceof ApiError && error.status === 402;
 
 async function errorMessageFromResponse(response: Response): Promise<string> {
   const text = await response.text();
@@ -40,7 +49,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status, await errorMessageFromResponse(response));
+    emitPointsUpdate(response);
+    const pointsRequired = Number(response.headers.get('X-Points-Required'));
+    const pointsRemaining = Number(response.headers.get('X-Points-Remaining'));
+    throw new ApiError(response.status, await errorMessageFromResponse(response), {
+      pointsRequired: Number.isFinite(pointsRequired) ? pointsRequired : undefined,
+      pointsRemaining: Number.isFinite(pointsRemaining) ? pointsRemaining : undefined,
+      pointsReason: response.headers.get('X-Points-Reason') || undefined,
+    });
   }
   emitPointsUpdate(response);
   return response.json() as Promise<T>;

@@ -123,7 +123,7 @@ func (s *Server) setCORS(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
-	w.Header().Set("Access-Control-Expose-Headers", "X-Points-Charged, X-Points-Remaining, X-Points-Reason")
+	w.Header().Set("Access-Control-Expose-Headers", "X-Points-Charged, X-Points-Required, X-Points-Remaining, X-Points-Reason")
 }
 
 func apiSegments(path string) []string {

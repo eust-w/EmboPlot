@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"emboplot/backend/internal/models"
+	"emboplot/backend/internal/store"
 )
 
 const (
@@ -38,6 +40,12 @@ func (s *Server) reserveAICharge(w http.ResponseWriter, r *http.Request, charge 
 	userID := currentUserID(r.Context())
 	profile, err := s.repo.DebitPoints(r.Context(), userID, charge.Points, charge.Reason, charge.Metadata)
 	if err != nil {
+		if errors.Is(err, store.ErrInsufficientPoints) {
+			writeInsufficientPointHeaders(w, charge)
+			if currentProfile, profileErr := s.repo.GetProfile(r.Context(), userID); profileErr == nil {
+				w.Header().Set("X-Points-Remaining", strconv.Itoa(currentProfile.Points))
+			}
+		}
 		writeError(w, statusFromError(err), err.Error())
 		return nil, false
 	}
@@ -60,6 +68,12 @@ func (s *Server) reserveAICharge(w http.ResponseWriter, r *http.Request, charge 
 func writePointHeaders(w http.ResponseWriter, charge aiCharge, remaining int) {
 	w.Header().Set("X-Points-Charged", strconv.Itoa(charge.Points))
 	w.Header().Set("X-Points-Remaining", strconv.Itoa(remaining))
+	w.Header().Set("X-Points-Reason", charge.Reason)
+}
+
+func writeInsufficientPointHeaders(w http.ResponseWriter, charge aiCharge) {
+	w.Header().Set("X-Points-Required", strconv.Itoa(charge.Points))
+	w.Header().Set("X-Points-Remaining", "0")
 	w.Header().Set("X-Points-Reason", charge.Reason)
 }
 

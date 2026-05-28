@@ -683,6 +683,7 @@ export default function App() {
             setIsCreatorOpen={setIsCreatorOpen}
             libraryCharacters={bootstrap.characters}
             libraryStories={bootstrap.stories}
+            currentPoints={bootstrap.profile.points}
             persistRoomState={persistCurrentRoomState}
             persistScriptLinePatch={persistScriptLinePatch}
             scrollRef={scrollRef}

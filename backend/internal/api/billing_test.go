@@ -75,6 +75,15 @@ func TestInsufficientPointsBlocksAIRequest(t *testing.T) {
 	if rec.Code != http.StatusPaymentRequired {
 		t.Fatalf("expected status 402, got %d: %s", rec.Code, rec.Body.String())
 	}
+	if got := rec.Header().Get("X-Points-Required"); got != "2" {
+		t.Fatalf("expected required header 2, got %q", got)
+	}
+	if got := rec.Header().Get("X-Points-Remaining"); got != "0" {
+		t.Fatalf("expected remaining header 0, got %q", got)
+	}
+	if got := rec.Header().Get("X-Points-Reason"); got != "ai:speech" {
+		t.Fatalf("expected reason header ai:speech, got %q", got)
+	}
 	if calls != 0 {
 		t.Fatalf("expected model gateway not to be called, got %d calls", calls)
 	}

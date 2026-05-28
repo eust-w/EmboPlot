@@ -4,10 +4,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { LogType, type Character, type TheaterState, type AssetCategory, type StorySetting, type SpeechTarget } from '@/src/types';
 import { modelService } from '@/src/services/modelService';
+import { isInsufficientPointsError } from '@/src/services/api';
 import { useMediaQuery } from '@/src/hooks/useMediaQuery';
 import TypewriterText from './TypewriterText';
 
 type ScriptLineMediaPatch = Partial<Pick<TheaterState['scriptTimeline'][number], 'imageUrl' | 'audioUrl'>>;
+const IMAGE_GENERATE_COST_POINTS = 30;
 
 interface TheaterViewProps {
   state: TheaterState;
@@ -23,6 +25,7 @@ interface TheaterViewProps {
   setIsCreatorOpen: (val: boolean) => void;
   libraryCharacters: Character[];
   libraryStories: StorySetting[];
+  currentPoints: number;
   persistRoomState: (state: TheaterState) => void;
   persistScriptLinePatch: (lineId: string, patch: ScriptLineMediaPatch) => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
@@ -41,7 +44,7 @@ interface TheaterViewProps {
 }
 
 export const TheaterView: React.FC<TheaterViewProps> = (props) => {
-  const { state, setState, input, setInput, showMentions, setShowMentions, sidebarOpen, setSidebarOpen, activeTab, setActiveTab, setIsCreatorOpen, libraryCharacters, libraryStories, persistRoomState, persistScriptLinePatch, scrollRef, theaterRef, onBack, handleSend, generateNext, handleExport, exportingFormat, speechTarget, setSpeechTarget, voicePlaybackBusy, setVoicePlaybackBusy, voiceBacklogCount, setVoiceBacklogCount } = props;
+  const { state, setState, input, setInput, showMentions, setShowMentions, sidebarOpen, setSidebarOpen, activeTab, setActiveTab, setIsCreatorOpen, libraryCharacters, libraryStories, currentPoints, persistRoomState, persistScriptLinePatch, scrollRef, theaterRef, onBack, handleSend, generateNext, handleExport, exportingFormat, speechTarget, setSpeechTarget, voicePlaybackBusy, setVoicePlaybackBusy, voiceBacklogCount, setVoiceBacklogCount } = props;
 
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
   const [generatingVoices, setGeneratingVoices] = useState<Set<string>>(new Set());
@@ -70,6 +73,16 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
     persistScriptLinePatch(lineId, patch);
   };
 
+  const showInsufficientPointsAlert = (required = IMAGE_GENERATE_COST_POINTS, remaining = currentPoints) => {
+    alert(`剧情币不足：本次生成场景图需要 ${required} POINTS，当前剩余 ${Math.max(remaining, 0)} POINTS。请到「账户资产」充值后再试。`);
+  };
+
+  const ensureEnoughImagePoints = () => {
+    if (currentPoints >= IMAGE_GENERATE_COST_POINTS) return true;
+    showInsufficientPointsAlert();
+    return false;
+  };
+
   useEffect(() => {
     if (isMobile) {
       setSidebarOpen(false);
@@ -79,6 +92,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
   const handleGenerateImage = async (lineId: string) => {
     const line = state.scriptTimeline.find(l => l.id === lineId);
     if (!line) return;
+    if (!ensureEnoughImagePoints()) return;
 
     setGeneratingImages(prev => new Set(prev).add(lineId));
     try {
@@ -87,6 +101,10 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
 
       applyScriptLinePatch(lineId, { imageUrl });
     } catch (error) {
+      if (isInsufficientPointsError(error)) {
+        showInsufficientPointsAlert(error.pointsRequired, error.pointsRemaining);
+        return;
+      }
       const message = error instanceof Error ? error.message : '未知错误';
       alert(`图片生成失败：${message}`);
     } finally {
@@ -112,6 +130,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
 
   const handleGenerateSelectionImage = async () => {
     if (selectedLines.length === 0 || isGeneratingSelectionImage) return;
+    if (!ensureEnoughImagePoints()) return;
 
     setIsGeneratingSelectionImage(true);
     try {
@@ -126,6 +145,10 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
       applyScriptLinePatch(targetLineId, { imageUrl });
       setSelectedLineIds(new Set());
     } catch (error) {
+      if (isInsufficientPointsError(error)) {
+        showInsufficientPointsAlert(error.pointsRequired, error.pointsRemaining);
+        return;
+      }
       const message = error instanceof Error ? error.message : '未知错误';
       alert(`场景图生成失败：${message}`);
     } finally {
@@ -585,10 +608,11 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
                       <button
                         onClick={handleGenerateSelectionImage}
                         disabled={isGeneratingSelectionImage}
+                        title={`生成场景图将消耗 ${IMAGE_GENERATE_COST_POINTS} POINTS`}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-zinc-950 text-[10px] font-black hover:scale-105 active:scale-95 transition-all disabled:opacity-60 disabled:hover:scale-100"
                       >
                         {isGeneratingSelectionImage ? <Loader2 size={14} className="animate-spin" /> : <Images size={14} />}
-                        生成场景图
+                        生成场景图 · {IMAGE_GENERATE_COST_POINTS}
                       </button>
                     </div>
                   </motion.div>
