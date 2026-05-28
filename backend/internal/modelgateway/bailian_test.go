@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"emboplot/backend/internal/models"
 )
 
 func TestEmbedUsesCompatibleEmbeddingsEndpoint(t *testing.T) {
@@ -135,6 +137,44 @@ func TestGenerateImageNormalizesPromptBeforeWanRequest(t *testing.T) {
 	}
 	if imagePrompt == "" {
 		t.Fatal("expected image endpoint to receive a prompt")
+	}
+}
+
+func TestGenerateScriptLineFallsBackWhenModelRepeatsRecentContent(t *testing.T) {
+	repeated := "远处的车灯闪过，瞬间照亮了便利店门口紧绷的氛围。"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"type\":\"director\",\"name\":\"导演\",\"content\":\"远处的车灯闪过，瞬间照亮了便利店门口紧绷的氛围。\"}"}}]}`))
+	}))
+	defer server.Close()
+
+	gateway := New(Config{
+		APIKey:            "test-key",
+		CompatibleBaseURL: server.URL,
+		DashScopeBaseURL:  server.URL,
+		ChatModel:         "qwen-plus",
+		Timeout:           time.Second,
+	}, server.Client())
+
+	result, err := gateway.GenerateScriptLine(context.Background(), models.Room{
+		CurrentStory: models.StorySetting{Title: "青涩的回响", Description: "雨夜便利店"},
+		ActiveChars: []models.Character{
+			{ID: "char_a", Name: "林深", Memory: "记得雨夜便利店的重逢。"},
+		},
+		GameSettings: models.GameSettings{Mood: "戏剧冲突"},
+		ScriptTimeline: []models.ScriptLine{
+			{Type: models.LogTypeDirector, Name: "导演", Content: repeated},
+			{Type: models.LogTypeCharacter, CharacterID: "char_a", Name: "林深", Content: "你听见了吗？"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("generate script line: %v", err)
+	}
+	if result.Content == "" || result.Content == repeated {
+		t.Fatalf("expected duplicate content to be blocked, got %+v", result)
 	}
 }
 

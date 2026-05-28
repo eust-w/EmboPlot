@@ -88,6 +88,10 @@ func (g *BailianGateway) GenerateScriptLine(ctx context.Context, room models.Roo
 		g.logFallback("generate_script_line.empty_content", errors.New("empty content"))
 		return g.fallback.GenerateScriptLine(ctx, room)
 	}
+	if isRecentDuplicateContent(line.Content, room.ScriptTimeline) {
+		g.logFallback("generate_script_line.duplicate_content", errors.New("duplicate content"))
+		return g.fallback.GenerateScriptLine(ctx, room)
+	}
 	return line, nil
 }
 

@@ -37,6 +37,29 @@ func TestScriptPromptCarriesContinuityRules(t *testing.T) {
 	}
 }
 
+func TestScriptPromptCarriesRecentContentBlacklist(t *testing.T) {
+	repeated := "远处的车灯闪过，瞬间照亮了便利店门口紧绷的氛围。"
+	prompt := scriptPrompt(models.Room{
+		CurrentStory: models.StorySetting{Title: "青涩的回响", Description: "雨夜便利店"},
+		ScriptTimeline: []models.ScriptLine{
+			{Type: models.LogTypeDirector, Content: repeated},
+			{Type: models.LogTypeCharacter, CharacterID: "char_a", Name: "林深", Content: "你听见了吗？"},
+		},
+	})
+	var payload struct {
+		RecentContentBlacklist []string `json:"recentContentBlacklist"`
+	}
+	if err := json.Unmarshal([]byte(prompt), &payload); err != nil {
+		t.Fatalf("decode prompt payload: %v", err)
+	}
+	if len(payload.RecentContentBlacklist) == 0 || payload.RecentContentBlacklist[0] != repeated {
+		t.Fatalf("expected recent content blacklist to include repeated text, got %+v", payload.RecentContentBlacklist)
+	}
+	if !strings.Contains(prompt, "recentContentBlacklist") || !strings.Contains(prompt, "不得与 recentContentBlacklist") {
+		t.Fatalf("expected prompt to forbid repeated content, got %s", prompt)
+	}
+}
+
 func TestScriptPromptRequiresDialogueTargetSchema(t *testing.T) {
 	prompt := scriptPrompt(models.Room{
 		CurrentStory: models.StorySetting{Title: "青涩的回响", Description: "雨夜便利店"},

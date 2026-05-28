@@ -44,6 +44,7 @@ func scriptPrompt(room models.Room) string {
 		"activeCharacters":       briefs,
 		"silentActiveCharacters": silentActiveCharacters(room.ActiveChars, recent),
 		"recentTimeline":         recent,
+		"recentContentBlacklist": recentContentBlacklist(recent),
 		"mustUseContinuity":      continuityFacts(recent),
 		"requiredNextType":       requiredNextType(recent),
 		"contextPolicy": []string{
@@ -61,6 +62,7 @@ func scriptPrompt(room models.Room) string {
 			"如果上一句直接点名或质问某个角色，下一句优先让被点名者回应，或让发话者继续对同一对象说话；不要让角色关系断裂。",
 			"如果 silentActiveCharacters 非空，说明这些已上场角色最近没有说话或未被提及；接下来优先用导演旁白确认其在场，或让其他角色对其发问，再让其自然回应。",
 			"每 2-4 句角色对白之间应穿插导演旁白或场面调度，说明环境、动作、沉默、视线、物件或节奏变化。",
+			"content 不得与 recentContentBlacklist 中任一内容相同或近似复述；如果要回应同一事实，必须提供新的动作、结果或情绪变化。",
 			"避免重复同一个词头、口癖或省略号；除非角色设定要求，不要连续多句以同样标点开头。",
 			"不要输出解释，不要输出 Markdown，只输出一个 JSON 对象。",
 		},

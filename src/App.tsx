@@ -45,6 +45,15 @@ const roomFromState = (snapshot: TheaterState, existing?: Room): Room => ({
   updatedAt: existing?.updatedAt,
 });
 
+const normalizeScriptContentForRepeat = (value: string) =>
+  value.replace(/[\s\p{P}\p{S}]/gu, '').toLowerCase();
+
+const isRecentDuplicateScriptContent = (content: string, timeline: ScriptLine[]) => {
+  const normalized = normalizeScriptContentForRepeat(content);
+  if (!normalized) return false;
+  return timeline.slice(-8).some((line) => normalizeScriptContentForRepeat(line.content) === normalized);
+};
+
 const initialState = (): TheaterState => ({
   view: 'rooms',
   gameSettings: {
@@ -87,6 +96,7 @@ export default function App() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const theaterRef = useRef<HTMLDivElement>(null);
+  const generationInFlightRef = useRef(false);
 
   const loadBootstrap = async () => {
     const data = await apiService.getBootstrap();
@@ -213,7 +223,8 @@ export default function App() {
   };
 
   const generateNext = async (historyOverride?: ScriptLine[]) => {
-    if (state.engine.isGenerating) return;
+    if (generationInFlightRef.current || state.engine.isGenerating) return;
+    generationInFlightRef.current = true;
     setState(prev => ({ ...prev, engine: { ...prev.engine, isGenerating: true } }));
 
     try {
@@ -230,13 +241,21 @@ export default function App() {
         content: newLineData.content || ''
       };
 
-      setState(prev => ({
-        ...prev,
-        scriptTimeline: [...prev.scriptTimeline, newLine],
-        engine: { ...prev.engine, isGenerating: false }
-      }));
+      setState(prev => {
+        if (isRecentDuplicateScriptContent(newLine.content, prev.scriptTimeline)) {
+          console.warn('Blocked duplicate generated script line:', newLine.content);
+          return { ...prev, engine: { ...prev.engine, autoPilot: false } };
+        }
+        return {
+          ...prev,
+          scriptTimeline: [...prev.scriptTimeline, newLine],
+        };
+      });
     } catch (error) {
       console.error(error);
+      setState(prev => ({ ...prev, engine: { ...prev.engine, autoPilot: false } }));
+    } finally {
+      generationInFlightRef.current = false;
       setState(prev => ({ ...prev, engine: { ...prev.engine, isGenerating: false } }));
     }
   };

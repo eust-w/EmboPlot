@@ -231,7 +231,9 @@ export const apiService = {
           gameSettings: room.gameSettings,
         }),
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiError && ![404, 502, 503, 504].includes(error.status)) throw error;
+      console.warn('Using local script fallback because generation API is unavailable:', error);
       const line = await mockService.fetchNextScriptLine(room.scriptTimeline);
       return {
         id: line.id || Math.random().toString(36).slice(2),

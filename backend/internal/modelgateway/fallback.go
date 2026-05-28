@@ -32,27 +32,30 @@ func (g FallbackGateway) Capabilities() Capabilities {
 func (g FallbackGateway) GenerateScriptLine(_ context.Context, room models.Room) (models.ScriptLine, error) {
 	nowMS := time.Now().UnixMilli()
 	if requiredNextType(room.ScriptTimeline) == string(models.LogTypeDirector) {
-		return models.ScriptLine{
+		line := models.ScriptLine{
 			ID:        store.NewID("line"),
 			Type:      models.LogTypeDirector,
 			Name:      "导演",
 			Content:   fallbackNarration(room),
 			CreatedAt: nowMS,
-		}, nil
+		}
+		return ensureFallbackLineUnique(line, room), nil
 	}
 	if len(room.ActiveChars) == 0 {
-		return models.ScriptLine{
+		line := models.ScriptLine{
 			ID:        store.NewID("line"),
 			Type:      models.LogTypeDirector,
+			Name:      "导演",
 			Content:   "场景短暂静默，新的事件正在暗处成形。",
 			CreatedAt: nowMS,
-		}, nil
+		}
+		return ensureFallbackLineUnique(line, room), nil
 	}
 
 	index := len(room.ScriptTimeline) % len(room.ActiveChars)
 	character := room.ActiveChars[index]
 	targetType, targetID, targetName := fallbackTarget(room, character)
-	return models.ScriptLine{
+	line := models.ScriptLine{
 		ID:          store.NewID("line"),
 		Type:        models.LogTypeCharacter,
 		CharacterID: character.ID,
@@ -61,14 +64,10 @@ func (g FallbackGateway) GenerateScriptLine(_ context.Context, room models.Room)
 		TargetID:    targetID,
 		TargetName:  targetName,
 		Action:      "百炼网关本地 fallback",
-		Content: fmt.Sprintf(
-			"我会按“%s”的基调继续推进。%s仍会记得：%s",
-			firstNonEmpty(room.GameSettings.Mood, "戏剧冲突"),
-			character.Name,
-			firstNonEmpty(character.Memory, room.CurrentStory.Description),
-		),
-		CreatedAt: nowMS,
-	}, nil
+		Content:     fallbackCharacterContent(room, character),
+		CreatedAt:   nowMS,
+	}
+	return ensureFallbackLineUnique(line, room), nil
 }
 
 func fallbackTarget(room models.Room, speaker models.Character) (string, string, string) {
@@ -89,17 +88,68 @@ func fallbackTarget(room models.Room, speaker models.Character) (string, string,
 }
 
 func fallbackNarration(room models.Room) string {
-	last := ""
+	last := lastTimelineContent(room)
+	title := firstNonEmpty(room.CurrentStory.Title, "剧场")
+	variants := []string{
+		"%s的灯影向内收紧，刚才那句话留下的空白开始逼近每个人。",
+		"雨声短暂压过呼吸，%s把上一刻的因果推向更窄的现场。",
+		"%s里的沉默没有散开，新的细节沿着刚发生的事实浮上来。",
+		"空气像被按下暂停键，%s中所有目光都被上一句牵回原处。",
+	}
+	base := fmt.Sprintf(variants[len(room.ScriptTimeline)%len(variants)], title)
+	if last == "" {
+		return base
+	}
+	return fmt.Sprintf("%s 现场继续回应这条因果：%s", base, truncateRunes(last, 48))
+}
+
+func fallbackCharacterContent(room models.Room, character models.Character) string {
+	mood := firstNonEmpty(room.GameSettings.Mood, "戏剧冲突")
+	fact := firstNonEmpty(lastTimelineContent(room), character.Memory, room.CurrentStory.Description, "刚才发生的一切")
+	variants := []string{
+		"%s先不后退。按“%s”的基调看，这件事已经把我们推到下一步了：%s",
+		"%s压低声音，把注意力重新拉回现场。%s不是空话，关键还在这里：%s",
+		"%s停了一秒才开口。既然气氛已经变成“%s”，那我只问眼前这件事：%s",
+		"%s把刚才的反应咽回去，语气比之前更稳。%s继续成立，但新的变化是：%s",
+	}
+	return fmt.Sprintf(variants[len(room.ScriptTimeline)%len(variants)], character.Name, mood, truncateRunes(fact, 54))
+}
+
+func lastTimelineContent(room models.Room) string {
 	for i := len(room.ScriptTimeline) - 1; i >= 0; i-- {
 		if strings.TrimSpace(room.ScriptTimeline[i].Content) != "" {
-			last = room.ScriptTimeline[i].Content
-			break
+			return room.ScriptTimeline[i].Content
 		}
 	}
-	if last == "" {
-		return "灯光收拢到舞台中央，新的因果线正在黑暗里显形。"
+	return ""
+}
+
+func ensureFallbackLineUnique(line models.ScriptLine, room models.Room) models.ScriptLine {
+	if !isRecentDuplicateContent(line.Content, room.ScriptTimeline) {
+		return line
 	}
-	return fmt.Sprintf("上一句落下后，%s的空气短暂停滞。细节开始回应那条因果：%s", firstNonEmpty(room.CurrentStory.Title, "剧场"), truncateRunes(last, 48))
+	line.Content = forcedNonRepeatedContent(room, line.Type, firstNonEmpty(line.Name, "角色"))
+	if isRecentDuplicateContent(line.Content, room.ScriptTimeline) {
+		line.Type = models.LogTypeDirector
+		line.CharacterID = ""
+		line.Name = "导演"
+		line.TargetType = ""
+		line.TargetID = ""
+		line.TargetName = ""
+		line.Action = ""
+		line.Content = fmt.Sprintf("第%d个推演节点上，%s出现新的偏移，沉默转向下一次行动。", len(room.ScriptTimeline)+1, firstNonEmpty(room.CurrentStory.Title, "剧场"))
+	}
+	return line
+}
+
+func forcedNonRepeatedContent(room models.Room, lineType models.LogType, speaker string) string {
+	node := len(room.ScriptTimeline) + 1
+	title := firstNonEmpty(room.CurrentStory.Title, "剧场")
+	fact := truncateRunes(firstNonEmpty(lastTimelineContent(room), room.CurrentStory.Description, "上一刻的变化"), 42)
+	if lineType == models.LogTypeCharacter {
+		return fmt.Sprintf("%s在第%d个节点重新接住现场，不再重复刚才的话，只追问新的变化：%s", speaker, node, fact)
+	}
+	return fmt.Sprintf("第%d个节点里，%s没有回到原句，而是把现场推向新的细节：%s", node, title, fact)
 }
 
 func (g FallbackGateway) ParseCharacter(_ context.Context, filename string, content string) (models.Character, error) {

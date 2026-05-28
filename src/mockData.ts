@@ -123,6 +123,29 @@ export const MOCK_MARKET_CHARACTERS: Character[] = [
   }
 ];
 
+const MOCK_DIRECTOR_FALLBACKS = [
+  '雨声沿着玻璃门往下压，便利店里的沉默开始变得更窄。',
+  '收银台的灯闪了一下，把每个人未出口的反应都照得清清楚楚。',
+  '门外的积水被车轮碾开，刚才那句话留下的余震还贴在空气里。',
+  '货架深处传来轻微响动，现场的注意力被迫从旧句子移向新的细节。',
+  '冷柜的电流声拖长一拍，谁都知道下一句话不能再绕回原地。'
+];
+
+const normalizeMockScriptContent = (value: string) =>
+  value.replace(/[\s\p{P}\p{S}]/gu, '').toLowerCase();
+
+const pickMockDirectorLine = (history: ScriptLine[]) => {
+  const recent = history.slice(-6).map((line) => normalizeMockScriptContent(line.content));
+  const start = history.length % MOCK_DIRECTOR_FALLBACKS.length;
+  for (let offset = 0; offset < MOCK_DIRECTOR_FALLBACKS.length; offset += 1) {
+    const candidate = MOCK_DIRECTOR_FALLBACKS[(start + offset) % MOCK_DIRECTOR_FALLBACKS.length];
+    if (!recent.includes(normalizeMockScriptContent(candidate))) {
+      return candidate;
+    }
+  }
+  return `第 ${history.length + 1} 个推演节点里，便利店现场出现了新的细节。`;
+};
+
 export const mockService = {
   fetchNextScriptLine: async (history: ScriptLine[]): Promise<Partial<ScriptLine>> => {
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -144,7 +167,7 @@ export const mockService = {
     return {
       id: Math.random().toString(36).substr(2, 9),
       type: LogType.DIRECTOR,
-      content: '远处的车灯闪过，瞬间照亮了便利店门口紧绷的氛围。'
+      content: pickMockDirectorLine(history)
     };
   },
 
