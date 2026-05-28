@@ -1,47 +1,91 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Search, Sparkles, User, Image as ImageIcon, Map, ShoppingBag } from 'lucide-react';
-import { mockService } from '@/src/mockData';
+import React, { useEffect, useState } from 'react';
+import { Check, ChevronLeft, Loader2, Map, Search, Sparkles, ShoppingBag } from 'lucide-react';
 import { Character, StorySetting } from '@/src/types';
 import { motion, AnimatePresence } from 'motion/react';
 import { DetailModal } from './DetailModal';
 
-export const MarketView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const [characters, setCharacters] = useState<Character[]>([]);
-  const [stories, setStories] = useState<StorySetting[]>([]);
-  const [loading, setLoading] = useState(true);
+interface MarketViewProps {
+  onBack: () => void;
+  initialCharacters: Character[];
+  initialStories: StorySetting[];
+  onAcquireCharacter: (id: string) => Promise<Character>;
+  onAcquireStory: (id: string) => Promise<StorySetting>;
+}
+
+const creatorLabel = (creator?: string) => creator?.trim() || '匿名导演';
+
+const creatorInitial = (creator?: string) => creatorLabel(creator).slice(0, 1).toUpperCase();
+
+const assetKey = (type: 'character' | 'story', id: string) => `${type}:${id}`;
+
+export const MarketView: React.FC<MarketViewProps> = ({ onBack, initialCharacters, initialStories, onAcquireCharacter, onAcquireStory }) => {
+  const [characters, setCharacters] = useState<Character[]>(initialCharacters);
+  const [stories, setStories] = useState<StorySetting[]>(initialStories);
+  const [acquiredAssets, setAcquiredAssets] = useState<Set<string>>(new Set());
+  const [acquiringId, setAcquiringId] = useState<string | null>(null);
+  const [marketError, setMarketError] = useState('');
   
   const [selectedAsset, setSelectedAsset] = useState<{ type: 'character' | 'story', data: any } | null>(null);
 
-  const handleOffline = (id: string) => {
-    if (confirm('确认将此角色卡下线吗？下线后其他导演将无法在市场看到它。')) {
-      setCharacters(prev => prev.filter(c => c.id !== id));
-      alert('角色已成功下线');
+  useEffect(() => {
+    setCharacters(initialCharacters);
+  }, [initialCharacters]);
+
+  useEffect(() => {
+    setStories(initialStories);
+  }, [initialStories]);
+
+  const handleAcquireCharacter = async (event: React.MouseEvent<HTMLButtonElement>, character: Character) => {
+    event.stopPropagation();
+    const key = assetKey('character', character.id);
+    if (acquiredAssets.has(key) || acquiringId) return;
+    setAcquiringId(key);
+    setMarketError('');
+    try {
+      await onAcquireCharacter(character.id);
+      setAcquiredAssets(prev => new Set(prev).add(key));
+    } catch (error) {
+      setMarketError(error instanceof Error ? error.message : '获取失败');
+    } finally {
+      setAcquiringId(null);
     }
   };
 
-  const myPublishedCharacters = characters.filter(c => c.creator === 'Me');
-  const otherCharacters = characters.filter(c => c.creator !== 'Me');
+  const handleAcquireStory = async (event: React.MouseEvent<HTMLButtonElement>, story: StorySetting) => {
+    event.stopPropagation();
+    const key = assetKey('story', story.id);
+    if (acquiredAssets.has(key) || acquiringId) return;
+    setAcquiringId(key);
+    setMarketError('');
+    try {
+      await onAcquireStory(story.id);
+      setAcquiredAssets(prev => new Set(prev).add(key));
+    } catch (error) {
+      setMarketError(error instanceof Error ? error.message : '获取失败');
+    } finally {
+      setAcquiringId(null);
+    }
+  };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const [chars, stors] = await Promise.all([
-        mockService.getMarketCharacters(),
-        mockService.getMarketStories()
-      ]);
-      setCharacters(chars);
-      setStories(stors);
-      setLoading(false);
-    };
-    fetchData();
-  }, []);
-
-  if (loading) {
-     return (
-       <div className="h-full flex items-center justify-center bg-zinc-950">
-          <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-       </div>
-     );
-  }
+  const acquireButtonContent = (key: string) => {
+    if (acquiringId === key) {
+      return (
+        <>
+          <Loader2 size={13} className="animate-spin" />
+          获取中
+        </>
+      );
+    }
+    if (acquiredAssets.has(key)) {
+      return (
+        <>
+          <Check size={13} />
+          已加入
+        </>
+      );
+    }
+    return '免费获取';
+  };
 
   return (
     <div className="flex flex-col h-full bg-zinc-950 p-4 sm:p-6 lg:p-8 overflow-y-auto custom-scrollbar relative">
@@ -67,6 +111,7 @@ export const MarketView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <div>
             <h1 className="text-xl lg:text-3xl font-bold tracking-tight">内容市场</h1>
             <p className="text-[10px] lg:text-sm text-zinc-500 font-serif">发现灵感，开启新的平行时空</p>
+            {marketError && <p className="mt-1 text-[10px] font-mono uppercase text-red-300">{marketError}</p>}
           </div>
         </div>
         <div className="flex items-center w-full md:w-auto gap-4">
@@ -110,14 +155,17 @@ export const MarketView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <p className="text-sm text-zinc-500 line-clamp-2 leading-relaxed h-10">{setting.description}</p>
                 <div className="mt-4 flex items-center justify-between">
                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-zinc-800" />
-                      <span className="text-xs text-zinc-400">官方出品</span>
+                      <div className="w-6 h-6 rounded-full bg-zinc-800 text-[10px] font-black text-zinc-400 flex items-center justify-center">
+                        {creatorInitial(setting.creator)}
+                      </div>
+                      <span className="text-xs text-zinc-400">by {creatorLabel(setting.creator)}</span>
                    </div>
                    <button 
-                    onClick={(e) => { e.stopPropagation(); alert('此背景已加入你的剧本库'); }}
-                    className="text-amber-500 font-bold text-sm hover:underline"
+                    onClick={(event) => handleAcquireStory(event, setting)}
+                    disabled={acquiringId !== null || acquiredAssets.has(assetKey('story', setting.id))}
+                    className="flex items-center gap-1.5 text-amber-500 font-bold text-sm hover:underline disabled:text-zinc-500 disabled:no-underline"
                    >
-                     免费获取
+                     {acquireButtonContent(assetKey('story', setting.id))}
                    </button>
                 </div>
               </div>
@@ -134,43 +182,8 @@ export const MarketView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <h2 className="text-xl font-bold">精选角色卡</h2>
         </div>
 
-        {myPublishedCharacters.length > 0 && (
-          <div className="mb-12">
-            <h3 className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <User size={12} /> 我上线的角色
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4 lg:gap-6">
-              {myPublishedCharacters.map(char => (
-                 <motion.div 
-                  key={char.id}
-                  whileHover={{ scale: 1.02 }}
-                  onClick={() => setSelectedAsset({ type: 'character', data: char })}
-                  className="group bg-zinc-900 border border-amber-500/20 rounded-2xl p-3 lg:p-4 cursor-pointer relative"
-                 >
-                    <div className="aspect-square rounded-xl overflow-hidden mb-3 lg:mb-4 relative">
-                      <img src={char.avatar} className="w-full h-full object-cover" alt="" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleOffline(char.id); }}
-                          className="px-3 py-1.5 bg-red-500 text-white rounded-full text-[9px] font-black uppercase tracking-tighter hover:scale-110 transition-transform"
-                        >
-                          下线
-                        </button>
-                      </div>
-                    </div>
-                    <h4 className="font-bold text-xs lg:text-sm mb-1 truncate">{char.name}</h4>
-                    <p className="text-[9px] lg:text-[10px] text-zinc-500 leading-tight mb-3 h-8 line-clamp-2">{char.description}</p>
-                    <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                       <span className="text-[9px] text-amber-500 font-mono italic">我的创作</span>
-                    </div>
-                 </motion.div>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4 lg:gap-6">
-          {otherCharacters.map(char => (
+          {characters.map(char => (
              <motion.div 
               key={char.id}
               whileHover={{ scale: 1.02 }}
@@ -186,9 +199,16 @@ export const MarketView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </div>
                 <h4 className="font-bold text-xs lg:text-sm mb-1 truncate">{char.name}</h4>
                 <p className="text-[9px] lg:text-[10px] text-zinc-500 leading-tight mb-3 h-8 line-clamp-2">{char.description}</p>
-                <div className="flex items-center justify-between pt-2 lg:pt-3 border-t border-white/5">
-                   <span className="text-[9px] text-zinc-600 font-mono">by {char.creator || 'User'}</span>
-                   <span className="hidden sm:block text-[9px] font-bold text-amber-500">12.5k 收藏</span>
+                <div className="flex items-center justify-between gap-3 pt-2 lg:pt-3 border-t border-white/5">
+                   <span className="min-w-0 truncate text-[9px] text-zinc-600 font-mono">by {creatorLabel(char.creator)}</span>
+                   <button
+                    type="button"
+                    onClick={(event) => handleAcquireCharacter(event, char)}
+                    disabled={acquiringId !== null || acquiredAssets.has(assetKey('character', char.id))}
+                    className="shrink-0 flex items-center gap-1 text-[9px] font-bold text-amber-500 hover:text-amber-300 disabled:text-zinc-500"
+                   >
+                    {acquireButtonContent(assetKey('character', char.id))}
+                   </button>
                 </div>
              </motion.div>
           ))}

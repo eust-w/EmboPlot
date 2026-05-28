@@ -8,12 +8,14 @@ import { DetailModal } from './DetailModal';
 interface SetupViewProps {
   onStart: (settings: { story: StorySetting, characters: Character[], gameSettings: GameSettings, theaterName: string }) => void;
   onBack: () => void;
+  stories?: StorySetting[];
+  characters?: Character[];
 }
 
-export const SetupView: React.FC<SetupViewProps> = ({ onStart, onBack }) => {
+export const SetupView: React.FC<SetupViewProps> = ({ onStart, onBack, stories = MOCK_STORY_SETTINGS, characters = MOCK_CHARACTERS }) => {
   const [theaterName, setTheaterName] = useState('未命名推演剧目');
-  const [selectedStory, setSelectedStory] = useState<StorySetting>(MOCK_STORY_SETTINGS[0]);
-  const [selectedChars, setSelectedChars] = useState<Character[]>([MOCK_CHARACTERS[0]]);
+  const [selectedStory, setSelectedStory] = useState<StorySetting>(stories[0] || MOCK_STORY_SETTINGS[0]);
+  const [selectedChars, setSelectedChars] = useState<Character[]>([(characters[0] || MOCK_CHARACTERS[0])]);
   const [gameSettings, setGameSettings] = useState<GameSettings>({
     mood: 'Dramatic',
     pace: 'Balanced',
@@ -78,7 +80,7 @@ export const SetupView: React.FC<SetupViewProps> = ({ onStart, onBack }) => {
               <p className="text-[10px] text-zinc-600 font-bold uppercase">双击查看详情</p>
             </div>
             <div className="grid gap-3">
-              {MOCK_STORY_SETTINGS.map(story => (
+              {stories.map(story => (
                 <motion.div 
                   key={story.id}
                   whileHover={{ x: 4 }}
@@ -106,7 +108,7 @@ export const SetupView: React.FC<SetupViewProps> = ({ onStart, onBack }) => {
               <p className="text-[10px] text-zinc-600 font-bold uppercase">双击查看详情</p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-3">
-              {MOCK_CHARACTERS.map(char => {
+              {characters.map(char => {
                 const isSelected = selectedChars.some(c => c.id === char.id);
                 return (
                   <motion.div 

@@ -1,1 +1,28 @@
 @import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  background: #050505;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(245, 158, 11, 0.08), transparent 34rem),
+    radial-gradient(circle at 85% 20%, rgba(148, 163, 184, 0.08), transparent 30rem),
+    #050505;
+}
+
+.cosmic-shell {
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(5, 5, 5, 0.96)),
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.10), transparent 28rem),
+    #050505;
+}
+
+.glass-panel {
+  background: rgba(24, 24, 27, 0.72);
+  border: 1px solid rgba(245, 158, 11, 0.10);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(24px);
+}

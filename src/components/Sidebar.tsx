@@ -1,6 +1,6 @@
 import React from 'react';
-import { Play, Users, Clock, CreditCard, Menu, X, LayoutGrid, BookOpen, Monitor, User } from 'lucide-react';
-import { AppView } from '../types';
+import { LogOut, Users, X, LayoutGrid, BookOpen, Monitor, User } from 'lucide-react';
+import { AppView, AuthUser } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface SidebarProps {
@@ -8,9 +8,11 @@ interface SidebarProps {
   onViewChange: (view: AppView) => void;
   isOpen?: boolean;
   onToggle?: () => void;
+  user?: AuthUser | null;
+  onLogout?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, isOpen = false, onToggle }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, isOpen = false, onToggle, user, onLogout }) => {
   const MENU_ITEMS = [
     { id: 'rooms' as AppView, icon: <LayoutGrid size={22} />, label: '推演大厅' },
     { id: 'market' as AppView, icon: <BookOpen size={22} />, label: '内容市场' },
@@ -31,7 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, isO
           </div>
         </div>
         {onToggle && (
-          <button onClick={onToggle} className="lg:hidden p-2 text-zinc-400">
+          <button onClick={onToggle} aria-label="关闭导航" className="lg:hidden p-2 text-zinc-400">
             <X size={20} />
           </button>
         )}
@@ -58,11 +60,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, isO
       </nav>
 
       <div className="mt-auto pt-8 border-t border-white/5">
-        <div className="bg-zinc-900 rounded-[2rem] p-4 lg:p-6 relative overflow-hidden group border border-white/5">
-           <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <p className="text-[10px] font-bold text-zinc-200">推演引擎就绪</p>
-           </div>
+        <div className="bg-zinc-900 rounded-[2rem] p-4 lg:p-5 relative overflow-hidden border border-white/5">
+          <div className="flex items-center gap-3 min-w-0">
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt="" className="w-10 h-10 rounded-2xl object-cover shrink-0 border border-white/10" />
+            ) : (
+              <div className="w-10 h-10 rounded-2xl bg-amber-500 text-zinc-950 flex items-center justify-center font-black shrink-0">
+                {user?.avatarChar || 'E'}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black text-zinc-100 truncate">{user?.nickname || '导演'}</p>
+              <p className="text-[9px] text-zinc-500 font-mono truncate">{user?.uid || 'SESSION READY'}</p>
+            </div>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                aria-label="退出登录"
+                className="p-2 rounded-xl text-zinc-500 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                <LogOut size={16} />
+              </button>
+            )}
+          </div>
+          <div className="mt-4 flex items-center justify-between text-[10px] font-mono text-zinc-500">
+            <span>POINTS</span>
+            <span className="text-amber-400">{(user?.points || 0).toLocaleString()}</span>
+          </div>
         </div>
       </div>
     </div>

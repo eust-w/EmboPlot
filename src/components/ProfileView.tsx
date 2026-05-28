@@ -1,21 +1,58 @@
-import React, { useState } from 'react';
-import { ChevronLeft, Coins, CreditCard, Edit2, Camera, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ChevronLeft, Coins, CreditCard, Edit2, Camera, X, LogOut, Image as ImageIcon, Loader2, Sparkles, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Profile } from '@/src/types';
 
-export const ProfileView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const [coins, setCoins] = useState(2560);
+interface ProfileViewProps {
+  profile: Profile;
+  onBack: () => void;
+  onSaveProfile: (profile: Profile) => Promise<Profile>;
+  onGenerateProfileAvatar: (input: { nickname: string; signature: string; tags: string[]; prompt?: string }) => Promise<string>;
+  onLogout: () => Promise<void>;
+}
+
+const fileToAvatarDataURL = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onerror = () => reject(new Error('头像读取失败'));
+  reader.onload = () => {
+    const image = new Image();
+    image.onerror = () => reject(new Error('头像解析失败'));
+    image.onload = () => {
+      const size = 512;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('当前浏览器无法处理头像'));
+        return;
+      }
+      const scale = Math.max(size / image.width, size / image.height);
+      const width = image.width * scale;
+      const height = image.height * scale;
+      ctx.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.86));
+    };
+    image.src = String(reader.result || '');
+  };
+  reader.readAsDataURL(file);
+});
+
+export const ProfileView: React.FC<ProfileViewProps> = ({ profile: profileProp, onBack, onSaveProfile, onGenerateProfileAvatar, onLogout }) => {
   const [isEditing, setIsEditing] = useState(false);
-  
-  // User Profile State
-  const [profile, setProfile] = useState({
-    nickname: '平行演播者 E',
-    avatarChar: 'E',
-    signature: '用文字编织平行时空的导演。',
-    tags: ['科幻迷', '赛博朋克', '叙事大师'],
-    uid: 'ID: 88591240'
-  });
+  const [profile, setProfile] = useState<Profile>(profileProp);
+  const [avatarPrompt, setAvatarPrompt] = useState('');
+  const [avatarError, setAvatarError] = useState('');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const [editForm, setEditForm] = useState({ ...profile });
+
+  useEffect(() => {
+    setProfile(profileProp);
+    setEditForm(profileProp);
+  }, [profileProp]);
 
   const RECHARGE_PLANS = [
     { id: '1', coins: 500, price: 49, label: '入门' },
@@ -23,21 +60,85 @@ export const ProfileView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     { id: '3', coins: 6500, price: 499, label: '超值' },
   ];
 
-  const handleSaveProfile = () => {
-    setProfile(editForm);
-    setIsEditing(false);
+  const handleSaveProfile = async () => {
+    setIsSavingProfile(true);
+    setAvatarError('');
+    try {
+      const updated = await onSaveProfile(editForm);
+      setProfile(updated);
+      setEditForm(updated);
+      setIsEditing(false);
+    } catch (error) {
+      setAvatarError(error instanceof Error ? error.message : '资料保存失败');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setIsUploadingAvatar(true);
+    setAvatarError('');
+    try {
+      const avatarUrl = await fileToAvatarDataURL(file);
+      setEditForm(prev => ({ ...prev, avatarUrl }));
+    } catch (error) {
+      setAvatarError(error instanceof Error ? error.message : '头像上传失败');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleGenerateAvatar = async () => {
+    setIsGeneratingAvatar(true);
+    setAvatarError('');
+    try {
+      const avatarUrl = await onGenerateProfileAvatar({
+        nickname: editForm.nickname,
+        signature: editForm.signature,
+        tags: editForm.tags,
+        prompt: avatarPrompt,
+      });
+      setEditForm(prev => ({ ...prev, avatarUrl }));
+    } catch (error) {
+      setAvatarError(error instanceof Error ? error.message : 'AI 头像生成失败');
+    } finally {
+      setIsGeneratingAvatar(false);
+    }
+  };
+
+  const renderAvatar = (item: Profile, className: string, textClassName: string) => {
+    if (item.avatarUrl) {
+      return <img src={item.avatarUrl} alt="" className={`${className} object-cover border border-white/10`} />;
+    }
+    return (
+      <div className={`${className} bg-amber-500 flex items-center justify-center shadow-2xl shadow-amber-500/20`}>
+        <span className={`${textClassName} font-black text-zinc-950`}>{item.avatarChar}</span>
+      </div>
+    );
   };
 
   return (
     <div className="flex flex-col h-full bg-zinc-950 p-6 lg:p-12 overflow-y-auto custom-scrollbar relative">
-      <header className="flex items-center gap-4 lg:gap-6 mb-12 lg:mb-16">
-        <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-500">
-          <ChevronLeft size={24} />
-        </button>
-        <div>
-          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">账户中心</h1>
-          <p className="text-xs lg:text-sm text-zinc-500 font-serif">管理您的导演身份与剧场资产</p>
+      <header className="flex items-center justify-between gap-4 lg:gap-6 mb-12 lg:mb-16">
+        <div className="flex items-center gap-4 lg:gap-6 min-w-0">
+          <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-500">
+            <ChevronLeft size={24} />
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">账户中心</h1>
+            <p className="text-xs lg:text-sm text-zinc-500 font-serif">管理您的导演身份与剧场资产</p>
+          </div>
         </div>
+        <button
+          onClick={onLogout}
+          className="shrink-0 flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5 text-xs font-bold transition-colors"
+        >
+          <LogOut size={15} />
+          <span className="hidden sm:inline">退出</span>
+        </button>
       </header>
 
       <div className="grid grid-cols-12 gap-8 lg:gap-12">
@@ -46,9 +147,7 @@ export const ProfileView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <div className="bg-zinc-900 border border-white/5 rounded-[2rem] lg:rounded-[2.5rem] p-6 lg:p-10 overflow-hidden relative group">
             <div className="flex flex-col items-center text-center">
               <div className="relative mb-6">
-                <div className="w-20 h-20 lg:w-24 lg:h-24 bg-amber-500 rounded-[2rem] lg:rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-amber-500/20">
-                  <span className="text-3xl lg:text-4xl font-black text-zinc-950">{profile.avatarChar}</span>
-                </div>
+                {renderAvatar(profile, 'w-20 h-20 lg:w-24 lg:h-24 rounded-[2rem] lg:rounded-[2.5rem]', 'text-3xl lg:text-4xl')}
                 <button 
                   onClick={() => setIsEditing(true)}
                   className="absolute -bottom-1 -right-1 lg:-bottom-2 lg:-right-2 p-2 bg-zinc-800 border border-white/10 rounded-full text-zinc-400 hover:text-white transition-colors"
@@ -88,7 +187,7 @@ export const ProfileView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               <Coins size={12} /> 剧场剧情币
             </div>
             <div className="flex items-end gap-1.5 lg:gap-2 mb-2">
-              <p className="text-4xl lg:text-5xl font-black text-white tracking-tighter">{coins.toLocaleString()}</p>
+              <p className="text-4xl lg:text-5xl font-black text-white tracking-tighter">{profile.points.toLocaleString()}</p>
               <p className="text-amber-500 text-[10px] font-bold mb-1.5 lg:mb-2 uppercase">Points</p>
             </div>
             <p className="text-zinc-500 text-[9px] lg:text-[10px] leading-relaxed">剧情币可用于加速推演、生成高质量视觉素材与解锁高级剧本模型。</p>
@@ -148,8 +247,13 @@ export const ProfileView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               
               <div className="space-y-6">
                 <div className="flex items-center gap-6 mb-8">
-                  <div className="w-20 h-20 bg-amber-500 rounded-3xl flex items-center justify-center shrink-0">
-                    <span className="text-3xl font-black text-zinc-950">{editForm.avatarChar}</span>
+                  <div className="relative shrink-0">
+                    {renderAvatar(editForm, 'w-20 h-20 rounded-3xl', 'text-3xl')}
+                    {(isUploadingAvatar || isGeneratingAvatar) && (
+                      <div className="absolute inset-0 rounded-3xl bg-black/60 flex items-center justify-center">
+                        <Loader2 size={20} className="animate-spin text-amber-500" />
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1">
                     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-2">头像标识 (Single Char)</label>
@@ -161,6 +265,40 @@ export const ProfileView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                       className="w-full bg-zinc-800 border-white/10 rounded-xl px-4 py-2 text-white focus:ring-1 ring-amber-500 outline-none"
                     />
                   </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/5 bg-zinc-950/50 p-4">
+                  <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                    <label className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-2.5 text-xs font-bold text-zinc-200 hover:bg-zinc-700 transition-colors cursor-pointer border border-white/5">
+                      {isUploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                      上传头像
+                      <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateAvatar}
+                      disabled={isGeneratingAvatar || isUploadingAvatar}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-black text-zinc-950 hover:bg-amber-400 transition-colors disabled:opacity-60"
+                    >
+                      {isGeneratingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                      AI 生成
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">
+                    <ImageIcon size={12} /> 头像提示词
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={avatarPrompt}
+                    onChange={(event) => setAvatarPrompt(event.target.value)}
+                    placeholder="例如：黑金科技感、电影级侧脸、安静的导演气质..."
+                    className="w-full resize-none rounded-xl border border-white/5 bg-zinc-800 px-4 py-3 text-xs text-white outline-none ring-amber-500/20 focus:ring-1"
+                  />
+                  {avatarError && (
+                    <p className="mt-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                      {avatarError}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -202,9 +340,10 @@ export const ProfileView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </button>
                 <button 
                   onClick={handleSaveProfile}
-                  className="flex-1 py-4 bg-amber-500 text-zinc-950 rounded-2xl font-bold hover:scale-105 active:scale-95 transition-all shadow-xl shadow-amber-500/20"
+                  disabled={isSavingProfile || isUploadingAvatar || isGeneratingAvatar}
+                  className="flex-1 py-4 bg-amber-500 text-zinc-950 rounded-2xl font-bold hover:scale-105 active:scale-95 transition-all shadow-xl shadow-amber-500/20 disabled:opacity-60 disabled:hover:scale-100"
                 >
-                  保存设置
+                  {isSavingProfile ? '保存中...' : '保存设置'}
                 </button>
               </div>
             </motion.div>
@@ -214,4 +353,3 @@ export const ProfileView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     </div>
   );
 };
-

@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Send, AtSign, Play, Square, Download, LayoutGrid, ArrowLeft, Users, Plus, Sparkles, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Send, AtSign, Play, Pause, Download, LayoutGrid, ArrowLeft, Users, Plus, Sparkles, X, Images, Loader2, SkipForward, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
-import { LogType, type Character, type ScriptLine, type TheaterState, type AssetCategory } from '@/src/types';
-import { MOCK_CHARACTERS, MOCK_STORY_SETTINGS } from '@/src/mockData';
-import { geminiService } from '@/src/services/geminiService';
+import { LogType, type Character, type TheaterState, type AssetCategory, type StorySetting, type SpeechTarget } from '@/src/types';
+import { modelService } from '@/src/services/modelService';
+import { useMediaQuery } from '@/src/hooks/useMediaQuery';
 import TypewriterText from './TypewriterText';
 
 interface TheaterViewProps {
@@ -19,19 +19,49 @@ interface TheaterViewProps {
   activeTab: AssetCategory;
   setActiveTab: (val: AssetCategory) => void;
   setIsCreatorOpen: (val: boolean) => void;
+  libraryCharacters: Character[];
+  libraryStories: StorySetting[];
   scrollRef: React.RefObject<HTMLDivElement | null>;
   theaterRef: React.RefObject<HTMLDivElement | null>;
   onBack: () => void;
   handleSend: () => void;
   generateNext: () => void;
   handleExport: (format: 'png' | 'md') => void;
+  speechTarget: SpeechTarget;
+  setSpeechTarget: (target: SpeechTarget) => void;
+  voicePlaybackBusy: boolean;
+  setVoicePlaybackBusy: (busy: boolean) => void;
+  voiceBacklogCount: number;
+  setVoiceBacklogCount: (count: number) => void;
 }
 
 export const TheaterView: React.FC<TheaterViewProps> = (props) => {
-  const { state, setState, input, setInput, showMentions, setShowMentions, sidebarOpen, setSidebarOpen, activeTab, setActiveTab, setIsCreatorOpen, scrollRef, theaterRef, onBack, handleSend, generateNext, handleExport } = props;
+  const { state, setState, input, setInput, showMentions, setShowMentions, sidebarOpen, setSidebarOpen, activeTab, setActiveTab, setIsCreatorOpen, libraryCharacters, libraryStories, scrollRef, theaterRef, onBack, handleSend, generateNext, handleExport, speechTarget, setSpeechTarget, voicePlaybackBusy, setVoicePlaybackBusy, voiceBacklogCount, setVoiceBacklogCount } = props;
 
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
   const [generatingVoices, setGeneratingVoices] = useState<Set<string>>(new Set());
+  const [selectedLineIds, setSelectedLineIds] = useState<Set<string>>(new Set());
+  const [isGeneratingSelectionImage, setIsGeneratingSelectionImage] = useState(false);
+  const [autoVoice, setAutoVoice] = useState(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const autoVoiceRoomIdRef = useRef<string | null>(null);
+  const autoVoiceSeenLineIdsRef = useRef<Set<string>>(new Set());
+  const autoVoiceQueuedLineIdsRef = useRef<Set<string>>(new Set());
+  const autoVoiceQueueRef = useRef<Array<{ line: TheaterState['scriptTimeline'][number]; silent: boolean }>>([]);
+  const autoVoiceProcessingRef = useRef(false);
+  const voiceCurrentlyPlayingRef = useRef(false);
+  const voiceCacheRef = useRef<Map<string, { audioUrl?: string; promise?: Promise<string> }>>(new Map());
+  const isMobile = useMediaQuery('(max-width: 1023px)');
+  const sidebarExpanded = !isMobile || sidebarOpen;
+  const selectedLines = state.scriptTimeline.filter(line => selectedLineIds.has(line.id) && line.content.trim());
+  const speechTargetValue = speechTarget.type === 'character' && speechTarget.characterId ? `character:${speechTarget.characterId}` : speechTarget.type;
+  const engineStatus = state.engine.isGenerating ? '生成中' : voicePlaybackBusy ? '播报中' : state.engine.autoPilot ? '自动推演' : '已暂停';
+
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [isMobile, setSidebarOpen]);
 
   const handleGenerateImage = async (lineId: string) => {
     const line = state.scriptTimeline.find(l => l.id === lineId);
@@ -40,14 +70,15 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
     setGeneratingImages(prev => new Set(prev).add(lineId));
     try {
       const prompt = `A cinematic visualize for a script scene. Context: ${state.stage.currentStory.description}. Script line: "${line.content}". Character: ${line.name || 'Narrator'}. Style: epic concept art.`;
-      const imageUrl = await geminiService.generateImage(prompt);
-      
+      const imageUrl = await modelService.generateImage(prompt);
+
       setState(prev => ({
         ...prev,
         scriptTimeline: prev.scriptTimeline.map(l => l.id === lineId ? { ...l, imageUrl } : l)
       }));
     } catch (error) {
-      alert('图片生成失败');
+      const message = error instanceof Error ? error.message : '未知错误';
+      alert(`图片生成失败：${message}`);
     } finally {
       setGeneratingImages(prev => {
         const next = new Set(prev);
@@ -57,69 +88,264 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
     }
   };
 
-  const handlePlayVoice = async (lineId: string) => {
-    const line = state.scriptTimeline.find(l => l.id === lineId);
-    if (!line) return;
-
-    // Reset audioUrl to trigger autoPlay if it already exists
-    if (line.audioUrl) {
-      setState(prev => ({
-        ...prev,
-        scriptTimeline: prev.scriptTimeline.map(l => l.id === lineId ? { ...l, audioUrl: undefined } : l)
-      }));
-      setTimeout(() => {
-        setState(prev => ({
-          ...prev,
-          scriptTimeline: prev.scriptTimeline.map(l => l.id === lineId ? { ...l, audioUrl: line.audioUrl } : l)
-        }));
-      }, 50);
-      return;
-    }
-
-    setGeneratingVoices(prev => new Set(prev).add(lineId));
-    try {
-      const character = state.stage.activeCharacters.find(c => c.id === line.characterId);
-      const voiceName = character?.voiceName || 'Kore';
-      const audioUrl = await geminiService.generateSpeech(line.content, voiceName);
-      
-      setState(prev => ({
-        ...prev,
-        scriptTimeline: prev.scriptTimeline.map(l => l.id === lineId ? { ...l, audioUrl } : l)
-      }));
-    } catch (error) {
-      alert('语音合成失败');
-    } finally {
-      setGeneratingVoices(prev => {
-        const next = new Set(prev);
+  const toggleLineSelection = (lineId: string) => {
+    setSelectedLineIds(prev => {
+      const next = new Set(prev);
+      if (next.has(lineId)) {
         next.delete(lineId);
-        return next;
+      } else {
+        next.add(lineId);
+      }
+      return next;
+    });
+  };
+
+  const handleGenerateSelectionImage = async () => {
+    if (selectedLines.length === 0 || isGeneratingSelectionImage) return;
+
+    setIsGeneratingSelectionImage(true);
+    try {
+      const imageUrl = await modelService.generateImageFromLines({
+        roomTitle: state.roomInfo.title,
+        storyTitle: state.stage.currentStory.title,
+        storyDescription: state.stage.currentStory.description,
+        mood: state.gameSettings.mood,
+        lines: selectedLines,
       });
+      const targetLineId = selectedLines[selectedLines.length - 1].id;
+      setState(prev => ({
+        ...prev,
+        scriptTimeline: prev.scriptTimeline.map(line => line.id === targetLineId ? { ...line, imageUrl } : line)
+      }));
+      setSelectedLineIds(new Set());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      alert(`场景图生成失败：${message}`);
+    } finally {
+      setIsGeneratingSelectionImage(false);
     }
   };
 
+  const playAudioUrl = async (audioUrl: string, options: { waitForEnd?: boolean; interrupt?: boolean } = {}) => {
+    if (!audioUrl || audioUrl === 'data:audio/wav;base64,') {
+      throw new Error('empty audio url');
+    }
+    const shouldInterrupt = options.interrupt ?? true;
+    if (shouldInterrupt && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    const audio = new Audio(audioUrl);
+    audio.preload = 'auto';
+    audioRef.current = audio;
+    await audio.play();
+    if (!options.waitForEnd) return;
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        audio.removeEventListener('ended', handleEnded);
+        audio.removeEventListener('error', handleError);
+        audio.removeEventListener('pause', handlePause);
+      };
+      const handleEnded = () => {
+        cleanup();
+        resolve();
+      };
+      const handleError = () => {
+        cleanup();
+        reject(new Error('audio playback failed'));
+      };
+      const handlePause = () => {
+        if (!audio.ended) {
+          cleanup();
+          resolve();
+        }
+      };
+      audio.addEventListener('ended', handleEnded, { once: true });
+      audio.addEventListener('error', handleError, { once: true });
+      audio.addEventListener('pause', handlePause, { once: true });
+    });
+  };
+
+  const handleSpeechTargetChange = (value: string) => {
+    if (value.startsWith('character:')) {
+      setSpeechTarget({ type: 'character', characterId: value.slice('character:'.length) });
+      return;
+    }
+    if (value === 'air' || value === 'self' || value === 'everyone') {
+      setSpeechTarget({ type: value });
+    }
+  };
+
+  const voiceNameForLine = (line: TheaterState['scriptTimeline'][number]) => {
+    if (line.type === LogType.DIRECTOR) return 'Cherry';
+    const character = state.stage.activeCharacters.find(c => c.id === line.characterId);
+    return character?.voiceName || 'Kore';
+  };
+
+  const prefetchLineVoice = (line: TheaterState['scriptTimeline'][number]): Promise<string> | null => {
+    if (!line.content.trim() || line.type === LogType.USER) return null;
+    if (line.audioUrl) {
+      voiceCacheRef.current.set(line.id, { audioUrl: line.audioUrl });
+      return Promise.resolve(line.audioUrl);
+    }
+
+    const cached = voiceCacheRef.current.get(line.id);
+    if (cached?.audioUrl) return Promise.resolve(cached.audioUrl);
+    if (cached?.promise) return cached.promise;
+
+    setGeneratingVoices(prev => new Set(prev).add(line.id));
+    const promise = modelService.generateSpeech(line.content, voiceNameForLine(line))
+      .then((audioUrl) => {
+        voiceCacheRef.current.set(line.id, { audioUrl });
+        setState(prev => ({
+          ...prev,
+          scriptTimeline: prev.scriptTimeline.map(l => l.id === line.id ? { ...l, audioUrl } : l)
+        }));
+        return audioUrl;
+      })
+      .catch((error) => {
+        voiceCacheRef.current.delete(line.id);
+        throw error;
+      })
+      .finally(() => {
+        setGeneratingVoices(prev => {
+          const next = new Set(prev);
+          next.delete(line.id);
+          return next;
+        });
+      });
+    voiceCacheRef.current.set(line.id, { promise });
+    return promise;
+  };
+
+  const playLineVoice = async (line: TheaterState['scriptTimeline'][number], options: { silent?: boolean; waitForEnd?: boolean; interrupt?: boolean } = {}) => {
+    const audioPromise = prefetchLineVoice(line);
+    if (!audioPromise) return;
+
+    try {
+      const audioUrl = await audioPromise;
+      await playAudioUrl(audioUrl, { waitForEnd: options.waitForEnd, interrupt: options.interrupt });
+    } catch (error) {
+      if (!options.silent) {
+        alert(line.audioUrl ? '浏览器未能播放此音频' : '语音合成失败');
+      }
+    }
+  };
+
+  const handlePlayVoice = async (lineId: string) => {
+    const line = state.scriptTimeline.find(l => l.id === lineId);
+    if (!line) return;
+    enqueueVoiceLine(line, { silent: false });
+  };
+
+  const updateVoiceBacklog = () => {
+    setVoiceBacklogCount(autoVoiceQueueRef.current.length + (voiceCurrentlyPlayingRef.current ? 1 : 0));
+  };
+
+  const processAutoVoiceQueue = async () => {
+    if (autoVoiceProcessingRef.current) return;
+    autoVoiceProcessingRef.current = true;
+    setVoicePlaybackBusy(true);
+    updateVoiceBacklog();
+    try {
+      while (autoVoiceQueueRef.current.length > 0) {
+        const nextItem = autoVoiceQueueRef.current.shift();
+        if (!nextItem) continue;
+        autoVoiceQueuedLineIdsRef.current.delete(nextItem.line.id);
+        voiceCurrentlyPlayingRef.current = true;
+        updateVoiceBacklog();
+        await playLineVoice(nextItem.line, { silent: nextItem.silent, waitForEnd: true, interrupt: false });
+        voiceCurrentlyPlayingRef.current = false;
+        updateVoiceBacklog();
+        await new Promise(resolve => window.setTimeout(resolve, 180));
+      }
+    } finally {
+      autoVoiceProcessingRef.current = false;
+      voiceCurrentlyPlayingRef.current = false;
+      setVoicePlaybackBusy(false);
+      updateVoiceBacklog();
+    }
+  };
+
+  const enqueueVoiceLine = (line: TheaterState['scriptTimeline'][number], options: { silent: boolean }) => {
+    if (!line.content.trim() || line.type === LogType.USER) return;
+    if (autoVoiceQueuedLineIdsRef.current.has(line.id)) return;
+    autoVoiceQueuedLineIdsRef.current.add(line.id);
+    autoVoiceQueueRef.current.push({ line, silent: options.silent });
+    void prefetchLineVoice(line)?.catch(() => undefined);
+    updateVoiceBacklog();
+    void processAutoVoiceQueue();
+  };
+
+  useEffect(() => {
+    if (autoVoice) return;
+    autoVoiceQueueRef.current = [];
+    autoVoiceQueuedLineIdsRef.current.clear();
+    voiceCurrentlyPlayingRef.current = false;
+    voiceCacheRef.current.clear();
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    setVoicePlaybackBusy(false);
+    updateVoiceBacklog();
+  }, [autoVoice, setVoicePlaybackBusy]);
+
+  useEffect(() => {
+    if (autoVoiceRoomIdRef.current !== state.roomInfo.id) {
+      autoVoiceRoomIdRef.current = state.roomInfo.id;
+      autoVoiceSeenLineIdsRef.current = new Set(state.scriptTimeline.map(line => line.id));
+      autoVoiceQueuedLineIdsRef.current.clear();
+      autoVoiceQueueRef.current = [];
+      voiceCurrentlyPlayingRef.current = false;
+      voiceCacheRef.current.clear();
+      updateVoiceBacklog();
+      return;
+    }
+
+    const latest = state.scriptTimeline[state.scriptTimeline.length - 1];
+    if (!autoVoice || !latest || latest.type === LogType.USER || !latest.content.trim()) return;
+    if (autoVoiceSeenLineIdsRef.current.has(latest.id)) return;
+
+    autoVoiceSeenLineIdsRef.current.add(latest.id);
+    const timer = window.setTimeout(() => {
+      enqueueVoiceLine(latest, { silent: true });
+    }, 320);
+    return () => window.clearTimeout(timer);
+  }, [state.roomInfo.id, state.scriptTimeline, autoVoice]);
+
   return (
     <div className="flex h-full w-full relative">
+      {isMobile && sidebarOpen && (
+        <button
+          aria-label="关闭资产栏"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm"
+        />
+      )}
+
       {/* 侧边栏：分类资产管理 */}
-      <motion.aside 
+      <motion.aside
         initial={false}
-        animate={{ 
-          width: sidebarOpen ? (window.innerWidth < 1024 ? '100%' : 320) : 0, 
-          opacity: sidebarOpen ? 1 : 0,
+        animate={{
+          width: sidebarExpanded ? (isMobile ? 320 : 320) : 0,
+          x: sidebarExpanded ? 0 : -320,
+          opacity: sidebarExpanded ? 1 : 0,
           zIndex: 50
         }}
         className={cn(
-          "flex flex-col border-r border-zinc-900 bg-zinc-900 shadow-xl overflow-hidden",
-          window.innerWidth < 1024 ? "fixed inset-y-0 left-0" : "relative"
+          "flex flex-col border-r border-amber-500/10 bg-zinc-950/95 shadow-xl overflow-hidden backdrop-blur-2xl",
+          isMobile ? "fixed inset-y-0 left-0 max-w-[calc(100vw-1.5rem)]" : "relative shrink-0"
         )}
       >
         <div className="p-6 flex flex-col h-full">
           <div className="flex items-center justify-between mb-8">
-            <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500 flex items-center gap-2">
+            <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500 flex items-center gap-2" aria-label="返回大厅">
               <ArrowLeft size={18} />
               <span className="text-xs font-bold uppercase tracking-widest">返回大厅</span>
             </button>
-            <button 
-              onClick={() => setSidebarOpen(false)} 
+            <button
+              onClick={() => setSidebarOpen(false)}
+              aria-label="关闭资产栏"
               className="lg:hidden p-2 hover:bg-zinc-800 rounded-full text-zinc-500"
             >
               <X size={20} />
@@ -127,7 +353,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
           </div>
 
           <div className="flex gap-2 p-1 bg-zinc-800 rounded-xl mb-6">
-            <button 
+            <button
               onClick={() => setActiveTab('character')}
               className={cn(
                 "flex-1 py-1.5 text-xs font-medium rounded-lg transition-all",
@@ -136,7 +362,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
             >
               人物
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('story-setting')}
               className={cn(
                 "flex-1 py-1.5 text-xs font-medium rounded-lg transition-all",
@@ -175,7 +401,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
               </h3>
               <div className="flex gap-2">
                 {activeTab === 'character' && (
-                   <button 
+                   <button
                     onClick={() => {
                         const newPlayer: Character = {
                             id: `player_${Date.now()}`,
@@ -198,7 +424,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
                     <Users size={16} />
                   </button>
                 )}
-                <button 
+                <button
                   onClick={() => activeTab === 'character' && setIsCreatorOpen(true)}
                   className="text-amber-500 hover:text-amber-400 transition-colors"
                 >
@@ -209,9 +435,9 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
 
             <div className="grid gap-3 mb-8">
               {activeTab === 'character' ? (
-                MOCK_CHARACTERS.map(char => (
-                  <div 
-                    key={char.id} 
+                libraryCharacters.map(char => (
+                  <div
+                    key={char.id}
                     onClick={() => {
                         const isAlreadyActive = state.stage.activeCharacters.some(c => c.id === char.id);
                         if (!isAlreadyActive) {
@@ -235,8 +461,8 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
                   </div>
                 ))
               ) : (
-                MOCK_STORY_SETTINGS.map(story => (
-                  <div 
+                libraryStories.map(story => (
+                  <div
                     key={story.id}
                     onClick={() => setState(prev => ({ ...prev, stage: { ...prev.stage, currentStory: story } }))}
                     className="group relative h-24 rounded-xl overflow-hidden cursor-pointer border border-transparent hover:border-amber-500 transition-all"
@@ -257,7 +483,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
       <main className="flex-1 relative flex flex-col">
         <header className="h-16 lg:h-20 flex items-center justify-between px-4 lg:px-8 z-20 bg-zinc-950/50 backdrop-blur-md border-b border-white/5">
           <div className="flex items-center gap-4 lg:gap-8">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="切换资产栏" className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500">
               <LayoutGrid size={20} />
             </button>
             <div className="flex flex-col">
@@ -275,16 +501,18 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
                ))}
              </div>
              <div className="flex items-center bg-zinc-800 rounded-full p-1 border border-white/5 scale-90 lg:scale-100">
-               <button 
-                onClick={() => handleExport('png')} 
+               <button
+                onClick={() => handleExport('png')}
+                aria-label="导出 PNG 长图"
                 className="px-3 lg:px-4 py-1.5 hover:bg-zinc-700 rounded-full text-[10px] lg:text-xs font-bold transition-all flex items-center gap-2"
                 title="导出长图"
                >
                   <Download size={14} /> PNG
                </button>
                <div className="w-[1px] h-4 bg-white/10 mx-1" />
-               <button 
-                onClick={() => handleExport('md')} 
+               <button
+                onClick={() => handleExport('md')}
+                aria-label="导出 Markdown 剧本"
                 className="px-3 lg:px-4 py-1.5 hover:bg-zinc-700 rounded-full text-[10px] lg:text-xs font-bold transition-all flex items-center gap-2"
                 title="导出剧本"
                >
@@ -301,15 +529,49 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
 
           <div ref={scrollRef} className="flex-1 relative z-10 overflow-y-auto custom-scrollbar px-6 md:px-24 py-12">
             <div className="max-w-3xl mx-auto">
+              <AnimatePresence>
+                {selectedLines.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className="sticky top-0 z-20 mb-6 flex items-center justify-between gap-3 rounded-2xl border border-amber-500/20 bg-zinc-950/80 px-4 py-3 backdrop-blur-2xl shadow-2xl"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-zinc-100">已选 {selectedLines.length} 句台词</p>
+                      <p className="text-[10px] text-zinc-500 truncate">场景图会挂载到最后一句选中台词下方</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => setSelectedLineIds(new Set())}
+                        className="px-3 py-2 rounded-xl text-[10px] font-bold text-zinc-500 hover:text-white hover:bg-white/5 transition-colors"
+                      >
+                        清空
+                      </button>
+                      <button
+                        onClick={handleGenerateSelectionImage}
+                        disabled={isGeneratingSelectionImage}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-zinc-950 text-[10px] font-black hover:scale-105 active:scale-95 transition-all disabled:opacity-60 disabled:hover:scale-100"
+                      >
+                        {isGeneratingSelectionImage ? <Loader2 size={14} className="animate-spin" /> : <Images size={14} />}
+                        生成场景图
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               {state.scriptTimeline.map((line, idx) => (
-                <TypewriterText 
-                  key={line.id} 
-                  line={line} 
-                  isNew={idx === state.scriptTimeline.length - 1 && (line.type !== LogType.USER)} 
+                <TypewriterText
+                  key={line.id}
+                  line={line}
+                  isNew={idx === state.scriptTimeline.length - 1 && (line.type !== LogType.USER)}
                   onGenerateImage={handleGenerateImage}
                   onPlayVoice={handlePlayVoice}
                   isGeneratingImage={generatingImages.has(line.id)}
                   isGeneratingVoice={generatingVoices.has(line.id)}
+                  isSelected={selectedLineIds.has(line.id)}
+                  onToggleSelect={toggleLineSelection}
+                  typingDelayMs={autoVoice ? 62 : 40}
                 />
               ))}
               {state.engine.isGenerating && (
@@ -366,32 +628,47 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
             </AnimatePresence>
 
             <div className="bg-zinc-900/60 backdrop-blur-3xl border border-white/10 rounded-2xl lg:rounded-3xl p-2 lg:p-3 shadow-2xl flex items-center gap-2 lg:gap-4 transition-all focus-within:ring-2 ring-amber-500/20">
-              <button 
+              <button
                 onClick={() => setState(prev => ({ ...prev, engine: { ...prev.engine, autoPilot: !prev.engine.autoPilot } }))}
+                aria-label={state.engine.autoPilot ? '暂停自动推演' : '继续自动推演'}
                 className={cn(
                   "relative w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl flex items-center justify-center transition-all overflow-hidden group shrink-0",
                   state.engine.autoPilot ? "bg-amber-500 text-zinc-950" : "bg-white/5 text-zinc-400 hover:bg-white/10"
                 )}
               >
-                {state.engine.autoPilot ? <Play size={18} fill="currentColor" className="lg:hidden" /> : <Square size={18} className="lg:hidden" />}
-                {state.engine.autoPilot ? <Play size={22} fill="currentColor" className="hidden lg:block" /> : <Square size={22} className="hidden lg:block" />}
+                {state.engine.autoPilot ? <Pause size={18} className="lg:hidden" /> : <Play size={18} fill="currentColor" className="lg:hidden" />}
+                {state.engine.autoPilot ? <Pause size={22} className="hidden lg:block" /> : <Play size={22} fill="currentColor" className="hidden lg:block" />}
                 {state.engine.autoPilot && (
                   <div className="absolute inset-0 bg-white/20 animate-pulse pointer-events-none" />
                 )}
               </button>
 
+              <select
+                aria-label="说话对象"
+                value={speechTargetValue}
+                onChange={(event) => handleSpeechTargetChange(event.target.value)}
+                className="h-10 lg:h-12 max-w-[108px] shrink-0 rounded-xl border border-white/10 bg-zinc-950/70 px-2 text-[11px] font-bold text-zinc-200 outline-none transition-colors hover:border-amber-500/30 focus:border-amber-500/60"
+              >
+                <option value="everyone">对大家</option>
+                <option value="air">对空气</option>
+                <option value="self">自言自语</option>
+                {state.stage.activeCharacters.map(char => (
+                  <option key={char.id} value={`character:${char.id}`}>对 {char.name}</option>
+                ))}
+              </select>
+
               <div className="flex-1 relative">
-                 <input 
+                 <input
                   value={input}
                   onChange={(e) => {
                     const val = e.target.value;
                     setInput(val);
-                    
+
                     const lastAt = val.lastIndexOf('@');
                     if (lastAt !== -1) {
                       const textAfterAt = val.substring(lastAt + 1);
                       const textBeforeAt = val.substring(0, lastAt);
-                      
+
                       // Show mentions if "@" is at start or after a space, and no space after it yet
                       if ((textBeforeAt === "" || textBeforeAt.endsWith(" ")) && !textAfterAt.includes(" ")) {
                         setShowMentions(true);
@@ -423,9 +700,9 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
                     }
                   }}
                   placeholder={
-                    window.innerWidth < 640 
+                    isMobile
                     ? "输入并召唤 @角色"
-                    : (state.gameSettings.playerCharacterId 
+                    : (state.gameSettings.playerCharacterId
                       ? `正在以“${state.stage.activeCharacters.find(c => c.id === state.gameSettings.playerCharacterId)?.name}”身份对话...`
                       : "作为“上帝”干预剧情：输入动作或召唤 @角色")
                   }
@@ -434,14 +711,16 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
               </div>
 
               <div className="flex items-center gap-1 lg:gap-2">
-                <button 
+                <button
                   onClick={() => setShowMentions(!showMentions)}
+                  aria-label="召唤角色"
                   className={cn("p-1.5 lg:p-2 transition-colors", showMentions ? "text-amber-500" : "text-zinc-500 hover:text-zinc-300")}
                 >
                   <AtSign size={18} />
                 </button>
-                <button 
+                <button
                   onClick={handleSend}
+                  aria-label="发送导演指令"
                   disabled={!input.trim() || state.engine.isGenerating}
                   className="p-2.5 lg:p-3 bg-amber-500 text-zinc-950 rounded-xl lg:rounded-2xl hover:scale-105 active:scale-95 disabled:grayscale disabled:opacity-50 transition-all flex items-center justify-center shadow-lg shadow-amber-500/20"
                 >
@@ -456,15 +735,40 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
                 </button>
               </div>
             </div>
-            
+
             <div className="flex justify-between px-6">
                <p className="text-[10px] text-zinc-600 font-mono tracking-widest uppercase flex items-center gap-2">
-                 <span className="w-1.5 h-1.5 rounded-full bg-green-500/80 shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
-                 引擎状态: 推演中
+                 <span className={cn(
+                   "w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.35)]",
+                   state.engine.isGenerating ? "bg-amber-400 animate-pulse" : state.engine.autoPilot ? "bg-green-500/80" : "bg-zinc-600"
+                 )} />
+                 引擎状态: {engineStatus}
                </p>
                <div className="flex gap-4">
-                 <button onClick={generateNext} className="text-[10px] font-bold text-amber-500/60 hover:text-amber-500 uppercase tracking-widest transition-colors">
-                   下个台词 →
+                 <button
+                   onClick={() => setAutoVoice(prev => !prev)}
+                   className={cn(
+                     "flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest transition-colors",
+                     autoVoice ? "text-amber-500/80 hover:text-amber-400" : "text-zinc-500 hover:text-amber-500"
+                   )}
+                 >
+                   <Volume2 size={12} />
+                   {autoVoice ? '自动语音' : '语音关闭'}
+                 </button>
+                 <button
+                   onClick={() => setState(prev => ({ ...prev, engine: { ...prev.engine, autoPilot: !prev.engine.autoPilot } }))}
+                   disabled={state.engine.isGenerating}
+                   className="text-[10px] font-bold text-zinc-500 hover:text-amber-500 uppercase tracking-widest transition-colors disabled:opacity-40"
+                 >
+                   {state.engine.autoPilot ? '暂停' : '继续自动'}
+                 </button>
+                 <button
+                   onClick={generateNext}
+                   disabled={state.engine.isGenerating || voiceBacklogCount >= 2}
+                   className="flex items-center gap-1 text-[10px] font-bold text-amber-500/70 hover:text-amber-500 uppercase tracking-widest transition-colors disabled:opacity-40"
+                 >
+                   <SkipForward size={12} />
+                   手动推演
                  </button>
                </div>
             </div>

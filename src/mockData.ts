@@ -134,6 +134,8 @@ export const mockService = {
         type: LogType.CHARACTER,
         characterId: 'char_a',
         name: '林深',
+        targetType: 'everyone',
+        targetName: '对大家',
         action: '声音低哑，几乎被雨声盖过',
         content: '你终于还是对我用了“导演”的权力。既然这是你想看的结局……'
       };
