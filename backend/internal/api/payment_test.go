@@ -93,6 +93,41 @@ func TestCreateHupijiaoRechargeOrder(t *testing.T) {
 	}
 }
 
+func TestRechargePlansIncludeLowValueTopUps(t *testing.T) {
+	server := api.NewServer(store.NewMemoryStore(), api.ServerOptions{})
+	cookie := registerTestUser(t, server, "pay-plans@example.com")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/payments/plans", nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var payload struct {
+		Plans []struct {
+			ID          string `json:"id"`
+			Label       string `json:"label"`
+			Points      int    `json:"points"`
+			AmountCents int    `json:"amountCents"`
+		} `json:"plans"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode plans: %v", err)
+	}
+	wantAmounts := []int{200, 500, 2000, 4900, 9900, 49900}
+	wantPoints := []int{20, 50, 200, 500, 1200, 6500}
+	if len(payload.Plans) != len(wantAmounts) {
+		t.Fatalf("expected %d plans, got %+v", len(wantAmounts), payload.Plans)
+	}
+	for i := range wantAmounts {
+		if payload.Plans[i].AmountCents != wantAmounts[i] || payload.Plans[i].Points != wantPoints[i] {
+			t.Fatalf("plan %d mismatch: got %+v want amount=%d points=%d", i, payload.Plans[i], wantAmounts[i], wantPoints[i])
+		}
+	}
+}
+
 func TestHupijiaoNotifyCreditsPointsOnce(t *testing.T) {
 	repo := store.NewMemoryStore()
 	server := api.NewServer(repo, api.ServerOptions{

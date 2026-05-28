@@ -108,6 +108,9 @@ export const fallbackBootstrap: BootstrapData = {
 };
 
 export const fallbackRechargePlans: RechargePlan[] = [
+  { id: 'micro', label: '体验', points: 20, amountCents: 200 },
+  { id: 'lite', label: '轻量', points: 50, amountCents: 500 },
+  { id: 'daily', label: '日常', points: 200, amountCents: 2000 },
   { id: 'starter', label: '入门', points: 500, amountCents: 4900 },
   { id: 'pro', label: '推荐', points: 1200, amountCents: 9900 },
   { id: 'max', label: '超值', points: 6500, amountCents: 49900 },

@@ -70,6 +70,9 @@ func (c PaymentConfig) withDefaults() PaymentConfig {
 
 func defaultRechargePlans() []RechargePlan {
 	return []RechargePlan{
+		{ID: "micro", Label: "体验", Points: 20, AmountCents: 200},
+		{ID: "lite", Label: "轻量", Points: 50, AmountCents: 500},
+		{ID: "daily", Label: "日常", Points: 200, AmountCents: 2000},
 		{ID: "starter", Label: "入门", Points: 500, AmountCents: 4900},
 		{ID: "pro", Label: "推荐", Points: 1200, AmountCents: 9900},
 		{ID: "max", Label: "超值", Points: 6500, AmountCents: 49900},
