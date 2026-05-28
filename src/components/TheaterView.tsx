@@ -613,17 +613,17 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
           </div>
         </div>
 
-        <div className="absolute bottom-6 lg:bottom-8 left-1/2 -translate-x-1/2 w-full max-w-3xl px-4 lg:px-6 z-40">
-          <div className="relative flex flex-col gap-3">
+        <div className="absolute bottom-4 lg:bottom-8 left-1/2 -translate-x-1/2 w-full max-w-4xl px-3 sm:px-5 lg:px-8 z-40">
+          <div className="relative flex flex-col gap-3 pb-[env(safe-area-inset-bottom)]">
             <AnimatePresence>
               {showMentions && (
                 <motion.div
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute bottom-full left-0 mb-4 w-72 bg-zinc-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden p-2 ring-1 ring-black/50"
+                  className="absolute bottom-full left-0 mb-4 w-[min(22rem,calc(100vw-2rem))] bg-zinc-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden p-2 ring-1 ring-black/50"
                 >
-                  <p className="text-[10px] font-mono text-zinc-500 px-3 py-2 uppercase tracking-widest">登场人物列表</p>
+                  <p className="px-3 py-2 text-xs font-mono text-zinc-400 uppercase tracking-widest">登场人物列表</p>
                   {state.stage.activeCharacters
                     .filter(c => {
                       const lastAtIndex = input.lastIndexOf('@');
@@ -634,58 +634,60 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
                       return c.name.toLowerCase().includes(query);
                     })
                     .map(char => (
-                    <button
-                      key={char.id}
-                      onClick={() => {
-                        const lastAtIndex = input.lastIndexOf('@');
-                        const beforeAt = input.substring(0, lastAtIndex);
-                        setInput(beforeAt + "@" + char.name + " ");
-                        setShowMentions(false);
-                      }}
-                      className="w-full flex items-center gap-3 p-2 hover:bg-amber-500/10 rounded-xl transition-all group"
-                    >
-                      <img src={char.avatar} alt={char.name} className="w-10 h-10 rounded-lg object-cover ring-1 ring-white/5" />
-                      <div className="text-left">
-                        <p className="text-sm font-bold group-hover:text-amber-500">{char.name}</p>
-                        <p className="text-[10px] text-zinc-500 truncate w-40">{char.description}</p>
-                      </div>
-                    </button>
-                  ))}
+                      <button
+                        key={char.id}
+                        onClick={() => {
+                          const lastAtIndex = input.lastIndexOf('@');
+                          const beforeAt = input.substring(0, lastAtIndex);
+                          setInput(beforeAt + "@" + char.name + " ");
+                          setShowMentions(false);
+                        }}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-amber-500/10 rounded-xl transition-all group"
+                      >
+                        <img src={char.avatar} alt={char.name} className="w-10 h-10 rounded-lg object-cover ring-1 ring-white/5" />
+                        <div className="text-left">
+                          <p className="text-sm font-bold group-hover:text-amber-500">{char.name}</p>
+                          <p className="text-xs text-zinc-500 truncate w-52">{char.description}</p>
+                        </div>
+                      </button>
+                    ))}
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <div className="bg-zinc-900/60 backdrop-blur-3xl border border-white/10 rounded-2xl lg:rounded-3xl p-2 lg:p-3 shadow-2xl flex items-center gap-2 lg:gap-4 transition-all focus-within:ring-2 ring-amber-500/20">
-              <button
-                onClick={() => setState(prev => ({ ...prev, engine: { ...prev.engine, autoPilot: !prev.engine.autoPilot } }))}
-                aria-label={state.engine.autoPilot ? '暂停自动推演' : '继续自动推演'}
-                className={cn(
-                  "relative w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl flex items-center justify-center transition-all overflow-hidden group shrink-0",
-                  state.engine.autoPilot ? "bg-amber-500 text-zinc-950" : "bg-white/5 text-zinc-400 hover:bg-white/10"
-                )}
-              >
-                {state.engine.autoPilot ? <Pause size={18} className="lg:hidden" /> : <Play size={18} fill="currentColor" className="lg:hidden" />}
-                {state.engine.autoPilot ? <Pause size={22} className="hidden lg:block" /> : <Play size={22} fill="currentColor" className="hidden lg:block" />}
-                {state.engine.autoPilot && (
-                  <div className="absolute inset-0 bg-white/20 animate-pulse pointer-events-none" />
-                )}
-              </button>
+            <div className="bg-zinc-900/75 backdrop-blur-3xl border border-white/15 rounded-3xl p-2.5 sm:p-3 shadow-2xl shadow-black/40 ring-1 ring-black/40 transition-all focus-within:ring-2 focus-within:ring-amber-500/30">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 lg:gap-4">
+                <button
+                  type="button"
+                  onClick={() => setState(prev => ({ ...prev, engine: { ...prev.engine, autoPilot: !prev.engine.autoPilot } }))}
+                  aria-label={state.engine.autoPilot ? '暂停自动推演' : '继续自动推演'}
+                  className={cn(
+                    "relative h-12 sm:h-14 min-w-12 sm:min-w-[8.75rem] rounded-2xl flex items-center justify-center gap-2 px-4 transition-all overflow-hidden group shrink-0 text-sm font-black",
+                    state.engine.autoPilot ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20" : "bg-white/10 text-zinc-200 hover:bg-white/15"
+                  )}
+                >
+                  {state.engine.autoPilot ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
+                  <span className="hidden sm:inline">{state.engine.autoPilot ? '暂停推演' : '自动推演'}</span>
+                  {state.engine.autoPilot && (
+                    <div className="absolute inset-0 bg-white/20 animate-pulse pointer-events-none" />
+                  )}
+                </button>
 
-              <select
-                aria-label="说话对象"
-                value={speechTargetValue}
-                onChange={(event) => handleSpeechTargetChange(event.target.value)}
-                className="h-10 lg:h-12 max-w-[108px] shrink-0 rounded-xl border border-white/10 bg-zinc-950/70 px-2 text-[11px] font-bold text-zinc-200 outline-none transition-colors hover:border-amber-500/30 focus:border-amber-500/60"
-              >
-                <option value="everyone">对大家</option>
-                <option value="air">对空气</option>
-                <option value="self">自言自语</option>
-                {state.stage.activeCharacters.map(char => (
-                  <option key={char.id} value={`character:${char.id}`}>对 {char.name}</option>
-                ))}
-              </select>
+                <select
+                  aria-label="说话对象"
+                  value={speechTargetValue}
+                  onChange={(event) => handleSpeechTargetChange(event.target.value)}
+                  className="h-12 sm:h-14 min-w-[7.5rem] sm:min-w-[8.25rem] shrink-0 rounded-2xl border border-white/10 bg-zinc-950/80 px-3 text-sm font-black text-zinc-100 outline-none transition-colors hover:border-amber-500/30 focus:border-amber-500/60"
+                >
+                  <option value="everyone">对大家</option>
+                  <option value="air">对空气</option>
+                  <option value="self">自言自语</option>
+                  {state.stage.activeCharacters.map(char => (
+                    <option key={char.id} value={`character:${char.id}`}>对 {char.name}</option>
+                  ))}
+                </select>
 
-              <div className="flex-1 relative">
+                <div className="flex-1 relative min-w-0">
                  <input
                   value={input}
                   onChange={(e) => {
@@ -734,68 +736,74 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
                       ? `正在以“${state.stage.activeCharacters.find(c => c.id === state.gameSettings.playerCharacterId)?.name}”身份对话...`
                       : "作为“上帝”干预剧情：输入动作或召唤 @角色")
                   }
-                  className="w-full bg-transparent border-none focus:ring-0 text-zinc-100 placeholder:text-zinc-600 text-sm lg:text-base font-medium"
+                  className="h-12 sm:h-14 w-full bg-transparent border-none focus:ring-0 text-zinc-100 placeholder:text-zinc-500 text-base lg:text-lg font-semibold"
                  />
-              </div>
+                </div>
 
-              <div className="flex items-center gap-1 lg:gap-2">
-                <button
-                  onClick={() => setShowMentions(!showMentions)}
-                  aria-label="召唤角色"
-                  className={cn("p-1.5 lg:p-2 transition-colors", showMentions ? "text-amber-500" : "text-zinc-500 hover:text-zinc-300")}
-                >
-                  <AtSign size={18} />
-                </button>
-                <button
-                  onClick={handleSend}
-                  aria-label="发送导演指令"
-                  disabled={!input.trim() || state.engine.isGenerating}
-                  className="p-2.5 lg:p-3 bg-amber-500 text-zinc-950 rounded-xl lg:rounded-2xl hover:scale-105 active:scale-95 disabled:grayscale disabled:opacity-50 transition-all flex items-center justify-center shadow-lg shadow-amber-500/20"
-                >
-                  {state.engine.isGenerating ? (
-                    <div className="w-5 h-5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Send size={18} className="lg:hidden" />
-                  )}
-                  {(!state.engine.isGenerating && (
-                    <Send size={20} className="hidden lg:block" />
-                  ))}
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowMentions(!showMentions)}
+                    aria-label="召唤角色"
+                    title="召唤角色"
+                    className={cn("h-12 w-12 sm:h-14 sm:w-14 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center transition-colors", showMentions ? "text-amber-400 border-amber-500/40 bg-amber-500/10" : "text-zinc-300 hover:text-white hover:bg-white/10")}
+                  >
+                    <AtSign size={21} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSend}
+                    aria-label="发送导演指令"
+                    disabled={!input.trim() || state.engine.isGenerating}
+                    className="h-12 sm:h-14 min-w-12 sm:min-w-[6.5rem] px-4 bg-amber-500 text-zinc-950 rounded-2xl hover:scale-[1.03] active:scale-95 disabled:grayscale disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-sm font-black shadow-lg shadow-amber-500/20"
+                  >
+                    {state.engine.isGenerating ? (
+                      <div className="w-5 h-5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Send size={20} />
+                    )}
+                    {!state.engine.isGenerating && <span className="hidden sm:inline">发送</span>}
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-between px-6">
-               <p className="text-[10px] text-zinc-600 font-mono tracking-widest uppercase flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-1 sm:px-3">
+               <p className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-zinc-950/70 px-3 py-2 text-xs font-bold text-zinc-300 shadow-lg shadow-black/20">
                  <span className={cn(
-                   "w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.35)]",
+                   "w-2 h-2 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.35)]",
                    state.engine.isGenerating ? "bg-amber-400 animate-pulse" : state.engine.autoPilot ? "bg-green-500/80" : "bg-zinc-600"
                  )} />
-                 引擎状态: {engineStatus}
+                 引擎状态：{engineStatus}
                </p>
-               <div className="flex gap-4">
+               <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center">
                  <button
+                   type="button"
                    onClick={() => setAutoVoice(prev => !prev)}
+                   aria-pressed={autoVoice}
                    className={cn(
-                     "flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest transition-colors",
-                     autoVoice ? "text-amber-500/80 hover:text-amber-400" : "text-zinc-500 hover:text-amber-500"
+                     "flex h-10 items-center justify-center gap-2 rounded-full border px-3 text-xs font-black transition-colors",
+                     autoVoice ? "border-amber-500/35 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15" : "border-white/10 bg-zinc-950/70 text-zinc-300 hover:bg-white/10"
                    )}
                  >
-                   <Volume2 size={12} />
+                   <Volume2 size={14} />
                    {autoVoice ? '自动语音' : '语音关闭'}
                  </button>
                  <button
+                   type="button"
                    onClick={() => setState(prev => ({ ...prev, engine: { ...prev.engine, autoPilot: !prev.engine.autoPilot } }))}
                    disabled={state.engine.isGenerating}
-                   className="text-[10px] font-bold text-zinc-500 hover:text-amber-500 uppercase tracking-widest transition-colors disabled:opacity-40"
+                   className="flex h-10 items-center justify-center rounded-full border border-white/10 bg-zinc-950/70 px-3 text-xs font-black text-zinc-200 transition-colors hover:border-amber-500/35 hover:text-amber-300 disabled:opacity-40"
                  >
-                   {state.engine.autoPilot ? '暂停' : '继续自动'}
+                   {state.engine.autoPilot ? '暂停自动' : '继续自动'}
                  </button>
                  <button
-                   onClick={generateNext}
+                   type="button"
+                   onClick={() => generateNext()}
                    disabled={state.engine.isGenerating || voiceBacklogCount >= 2}
-                   className="flex items-center gap-1 text-[10px] font-bold text-amber-500/70 hover:text-amber-500 uppercase tracking-widest transition-colors disabled:opacity-40"
+                   className="flex h-10 items-center justify-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 text-xs font-black text-amber-300 transition-colors hover:bg-amber-500/15 disabled:opacity-40"
                  >
-                   <SkipForward size={12} />
+                   <SkipForward size={14} />
                    手动推演
                  </button>
                </div>
