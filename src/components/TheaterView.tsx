@@ -9,6 +9,12 @@ import { useMediaQuery } from '@/src/hooks/useMediaQuery';
 import TypewriterText from './TypewriterText';
 
 type ScriptLineMediaPatch = Partial<Pick<TheaterState['scriptTimeline'][number], 'imageUrl' | 'audioUrl'>>;
+type TheaterNotice = {
+  tone: 'warning' | 'error';
+  title: string;
+  message: string;
+  action?: 'profile';
+};
 const IMAGE_GENERATE_COST_POINTS = 30;
 
 interface TheaterViewProps {
@@ -51,6 +57,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
   const [selectedLineIds, setSelectedLineIds] = useState<Set<string>>(new Set());
   const [isGeneratingSelectionImage, setIsGeneratingSelectionImage] = useState(false);
   const [autoVoice, setAutoVoice] = useState(true);
+  const [notice, setNotice] = useState<TheaterNotice | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const autoVoiceRoomIdRef = useRef<string | null>(null);
   const autoVoiceSeenLineIdsRef = useRef<Set<string>>(new Set());
@@ -73,13 +80,26 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
     persistScriptLinePatch(lineId, patch);
   };
 
-  const showInsufficientPointsAlert = (required = IMAGE_GENERATE_COST_POINTS, remaining = currentPoints) => {
-    alert(`剧情币不足：本次生成场景图需要 ${required} POINTS，当前剩余 ${Math.max(remaining, 0)} POINTS。请到「账户资产」充值后再试。`);
+  const showInsufficientPointsNotice = (required = IMAGE_GENERATE_COST_POINTS, remaining = currentPoints) => {
+    setNotice({
+      tone: 'warning',
+      title: '剧情币不足',
+      message: `本次生成场景图需要 ${required} POINTS，当前剩余 ${Math.max(remaining, 0)} POINTS。`,
+      action: 'profile',
+    });
+  };
+
+  const showImageFailureNotice = (title: string, message: string) => {
+    setNotice({
+      tone: 'error',
+      title,
+      message,
+    });
   };
 
   const ensureEnoughImagePoints = () => {
     if (currentPoints >= IMAGE_GENERATE_COST_POINTS) return true;
-    showInsufficientPointsAlert();
+    showInsufficientPointsNotice();
     return false;
   };
 
@@ -102,11 +122,11 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
       applyScriptLinePatch(lineId, { imageUrl });
     } catch (error) {
       if (isInsufficientPointsError(error)) {
-        showInsufficientPointsAlert(error.pointsRequired, error.pointsRemaining);
+        showInsufficientPointsNotice(error.pointsRequired, error.pointsRemaining);
         return;
       }
       const message = error instanceof Error ? error.message : '未知错误';
-      alert(`图片生成失败：${message}`);
+      showImageFailureNotice('图片生成失败', message);
     } finally {
       setGeneratingImages(prev => {
         const next = new Set(prev);
@@ -146,11 +166,11 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
       setSelectedLineIds(new Set());
     } catch (error) {
       if (isInsufficientPointsError(error)) {
-        showInsufficientPointsAlert(error.pointsRequired, error.pointsRemaining);
+        showInsufficientPointsNotice(error.pointsRequired, error.pointsRemaining);
         return;
       }
       const message = error instanceof Error ? error.message : '未知错误';
-      alert(`场景图生成失败：${message}`);
+      showImageFailureNotice('场景图生成失败', message);
     } finally {
       setIsGeneratingSelectionImage(false);
     }
@@ -254,7 +274,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
       await playAudioUrl(audioUrl, { waitForEnd: options.waitForEnd, interrupt: options.interrupt });
     } catch (error) {
       if (!options.silent) {
-        alert(line.audioUrl ? '浏览器未能播放此音频' : '语音合成失败');
+        showImageFailureNotice('语音播放失败', line.audioUrl ? '浏览器未能播放此音频，请稍后再试。' : '语音合成失败，请稍后再试。');
       }
     }
   };
@@ -645,6 +665,59 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
 
         <div data-testid="theater-composer" className="absolute bottom-4 lg:bottom-8 left-1/2 -translate-x-1/2 w-full max-w-4xl px-3 sm:px-5 lg:px-8 z-40">
           <div className="relative flex flex-col gap-3 pb-[env(safe-area-inset-bottom)]">
+            <AnimatePresence>
+              {notice && (
+                <motion.div
+                  data-testid="theater-notice"
+                  role="status"
+                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  className={cn(
+                    "flex flex-col gap-3 rounded-2xl border px-4 py-3 shadow-2xl backdrop-blur-2xl ring-1 sm:flex-row sm:items-center sm:justify-between",
+                    notice.tone === 'warning'
+                      ? "border-amber-400/65 bg-zinc-950/95 text-zinc-100 shadow-black/60 ring-amber-400/25"
+                      : "border-red-400/55 bg-zinc-950/95 text-zinc-100 shadow-black/60 ring-red-400/25"
+                  )}
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className={cn(
+                      "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
+                      notice.tone === 'warning' ? "bg-amber-500 text-zinc-950" : "bg-red-500/90 text-white"
+                    )}>
+                      <Sparkles size={16} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className={cn("text-sm font-black", notice.tone === 'warning' ? "text-amber-100" : "text-red-100")}>{notice.title}</p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-zinc-100">{notice.message}</p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {notice.action === 'profile' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNotice(null);
+                          setState(prev => ({ ...prev, view: 'profile' }));
+                        }}
+                        className="h-9 rounded-full bg-amber-400 px-4 text-xs font-black text-zinc-950 shadow-lg shadow-amber-950/30 transition-colors hover:bg-amber-300"
+                      >
+                        去充值
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      aria-label="关闭提示"
+                      onClick={() => setNotice(null)}
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-zinc-950/60 text-zinc-400 transition-colors hover:text-white"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <AnimatePresence>
               {showMentions && (
                 <motion.div

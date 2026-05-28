@@ -12,7 +12,7 @@ import { AuthView } from '@/src/components/AuthView';
 import { apiService, fallbackBootstrap, fallbackRechargePlans } from '@/src/services/api';
 import { domToPng } from 'modern-screenshot';
 import { motion, AnimatePresence } from 'motion/react';
-import { Loader2, Menu } from 'lucide-react';
+import { Loader2, Menu, X } from 'lucide-react';
 
 const stateFromRoom = (room: Room): TheaterState => ({
   view: 'theater',
@@ -55,6 +55,10 @@ const isRecentDuplicateScriptContent = (content: string, timeline: ScriptLine[])
 };
 
 type ScriptLineMediaPatch = Partial<Pick<ScriptLine, 'imageUrl' | 'audioUrl'>>;
+type AppNotice = {
+  title: string;
+  message: string;
+};
 
 const initialState = (): TheaterState => ({
   view: 'rooms',
@@ -97,6 +101,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile sidebar toggle
   const [activeTab, setActiveTab] = useState<AssetCategory>('character');
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
+  const [appNotice, setAppNotice] = useState<AppNotice | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const theaterRef = useRef<HTMLDivElement>(null);
@@ -368,7 +373,10 @@ export default function App() {
       link.click();
     } catch (err) {
       console.error('Export failed', err);
-      alert(format === 'audio' ? '音频导出失败，请稍后重试' : '导出失败，请稍后重试');
+      setAppNotice({
+        title: format === 'audio' ? '音频导出失败' : '导出失败',
+        message: '请稍后重试，或检查当前剧本内容是否完整。',
+      });
     } finally {
       setExportingFormat(null);
     }
@@ -786,6 +794,31 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {appNotice && (
+          <motion.div
+            role="status"
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            className="fixed right-4 top-4 z-[90] flex w-[calc(100vw-2rem)] max-w-sm items-start gap-3 rounded-2xl border border-red-400/55 bg-zinc-950/95 px-4 py-3 text-zinc-100 shadow-2xl shadow-black/60 ring-1 ring-red-400/20 backdrop-blur-2xl"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black text-red-100">{appNotice.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-100">{appNotice.message}</p>
+            </div>
+            <button
+              type="button"
+              aria-label="关闭提示"
+              onClick={() => setAppNotice(null)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-zinc-950/60 text-zinc-400 transition-colors hover:text-white"
+            >
+              <X size={15} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
