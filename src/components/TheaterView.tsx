@@ -557,7 +557,11 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
              <img src={state.stage.currentStory.coverImage} className="w-full h-full object-cover filter blur-[2px] brightness-[0.25]" alt="" />
           </div>
 
-          <div ref={scrollRef} className="flex-1 relative z-10 overflow-y-auto custom-scrollbar px-6 md:px-24 py-12">
+          <div
+            ref={scrollRef}
+            data-testid="theater-scroll"
+            className="flex-1 relative z-10 overflow-y-auto custom-scrollbar px-6 md:px-24 pt-10 md:pt-12 pb-[22rem] sm:pb-[16rem] lg:pb-[14rem]"
+          >
             <div className="max-w-3xl mx-auto">
               <AnimatePresence>
                 {selectedLines.length > 0 && (
@@ -615,7 +619,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
           </div>
         </div>
 
-        <div className="absolute bottom-4 lg:bottom-8 left-1/2 -translate-x-1/2 w-full max-w-4xl px-3 sm:px-5 lg:px-8 z-40">
+        <div data-testid="theater-composer" className="absolute bottom-4 lg:bottom-8 left-1/2 -translate-x-1/2 w-full max-w-4xl px-3 sm:px-5 lg:px-8 z-40">
           <div className="relative flex flex-col gap-3 pb-[env(safe-area-inset-bottom)]">
             <AnimatePresence>
               {showMentions && (
