@@ -1,0 +1,1 @@
+These original SVG placeholders depict fictional abstract figures. They are created for this repository and covered by its Apache-2.0 code/content license. No real-person likeness or third-party photograph is included.

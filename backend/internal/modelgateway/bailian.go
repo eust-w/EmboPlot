@@ -185,7 +185,7 @@ voiceName 必须从 Cherry, Serena, Ethan, Chelsie, Dylan, Jada, Andre 中选择
 	return models.Character{
 		ID:          store.NewID("char"),
 		Name:        name,
-		Avatar:      "https://i.pravatar.cc/300?u=" + name,
+		Avatar:      "/demo/sample-1799a760.svg?u=" + name,
 		Description: modelFieldString(parsed["description"]),
 		Personality: modelFieldString(parsed["personality"]),
 		Memory:      modelFieldString(parsed["memory"]),
@@ -225,7 +225,7 @@ func (g *BailianGateway) GenerateCharacter(ctx context.Context, req CharacterDra
 	return models.Character{
 		ID:          store.NewID("char"),
 		Name:        name,
-		Avatar:      "https://i.pravatar.cc/300?u=" + name,
+		Avatar:      "/demo/sample-1799a760.svg?u=" + name,
 		Description: firstNonEmpty(modelFieldString(parsed["description"]), req.Description, req.Prompt),
 		Personality: firstNonEmpty(modelFieldString(parsed["personality"]), req.Personality),
 		Memory:      firstNonEmpty(modelFieldString(parsed["memory"]), req.Memory),
@@ -268,7 +268,7 @@ func (g *BailianGateway) GenerateStory(ctx context.Context, req StoryDraftReques
 		ID:          store.NewID("story"),
 		Title:       title,
 		Description: firstNonEmpty(modelFieldString(parsed["description"]), req.Description, req.Prompt),
-		CoverImage:  "https://images.unsplash.com/photo-1516738901171-8eb4fc13bd20?w=800",
+		CoverImage:  "/demo/sample-756bbb60.svg",
 		Tags:        compactTags(tags),
 		Content:     firstNonEmpty(modelFieldString(parsed["content"]), req.Content),
 		Creator:     "Me",

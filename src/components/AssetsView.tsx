@@ -235,7 +235,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onBack, initialCharacter
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold">我的人物卡</h2>
                 <button
-                  onClick={() => openAsset('character', { id: `new_${Date.now()}`, name: '新角色', avatar: 'https://i.pravatar.cc/300', description: '', status: 'idle' }, 'edit')}
+                  onClick={() => openAsset('character', { id: `new_${Date.now()}`, name: '新角色', avatar: '/demo/sample-1799a760.svg', description: '', status: 'idle' }, 'edit')}
                   className="text-sm font-bold text-amber-500 flex items-center gap-1 hover:underline"
                 >
                   <Plus size={16} /> 创建新角色
@@ -283,7 +283,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onBack, initialCharacter
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold">我的故事背景</h2>
                 <button
-                  onClick={() => openAsset('story', { id: `new_${Date.now()}`, title: '新故事背景', coverImage: 'https://images.unsplash.com/photo-1516738901171-8eb4fc13bd20?w=800', description: '', tags: [], content: '' }, 'edit')}
+                  onClick={() => openAsset('story', { id: `new_${Date.now()}`, title: '新故事背景', coverImage: '/demo/sample-756bbb60.svg', description: '', tags: [], content: '' }, 'edit')}
                   className="text-sm font-bold text-amber-500 flex items-center gap-1 hover:underline"
                 >
                   <Plus size={16} /> 创建新背景

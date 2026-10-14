@@ -401,7 +401,7 @@ export const apiService = {
       return {
         id: `char_${Date.now()}`,
         name: file.name.replace(/\.[^.]+$/, '') || '新角色',
-        avatar: 'https://i.pravatar.cc/300',
+        avatar: '/demo/sample-1799a760.svg',
         description: `从文件《${file.name}》中解析出的核心背景。${content.slice(0, 40)}`,
         personality: '解析出的人格特征：忠诚、内敛、带有某种不可告人的秘密。',
         memory: '提取出的关键记忆点会在后端可用时写入云端记忆区。',

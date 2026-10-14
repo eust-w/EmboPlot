@@ -168,7 +168,7 @@ func (g FallbackGateway) ParseCharacter(_ context.Context, filename string, cont
 	return models.Character{
 		ID:          store.NewID("char"),
 		Name:        base,
-		Avatar:      "https://i.pravatar.cc/300?u=" + base,
+		Avatar:      "/demo/sample-1799a760.svg?u=" + base,
 		Description: "从《" + filename + "》解析出的角色背景：" + excerpt,
 		Personality: "后端解析建议：语气保持稳定，围绕原文动机行动；遇到冲突时先暴露目标，再暴露情绪。",
 		Memory:      "初始记忆区：" + excerpt,
@@ -190,7 +190,7 @@ func (g FallbackGateway) GenerateCharacter(_ context.Context, req CharacterDraft
 	return models.Character{
 		ID:          store.NewID("char"),
 		Name:        base,
-		Avatar:      "https://i.pravatar.cc/300?u=" + base,
+		Avatar:      "/demo/sample-1799a760.svg?u=" + base,
 		Description: excerpt,
 		Personality: firstNonEmpty(req.Personality, "根据提示生成：语气稳定，行动围绕核心欲望展开，遇到冲突先暴露目标再暴露情绪。"),
 		Memory:      firstNonEmpty(req.Memory, "初始记忆区："+excerpt),
@@ -214,7 +214,7 @@ func (g FallbackGateway) GenerateStory(_ context.Context, req StoryDraftRequest)
 		ID:          store.NewID("story"),
 		Title:       title,
 		Description: description,
-		CoverImage:  "https://images.unsplash.com/photo-1516738901171-8eb4fc13bd20?w=800",
+		CoverImage:  "/demo/sample-756bbb60.svg",
 		Tags:        tags,
 		Content:     firstNonEmpty(req.Content, "故事背景设定："+description),
 		Creator:     "Me",

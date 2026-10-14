@@ -453,7 +453,7 @@ export const TheaterView: React.FC<TheaterViewProps> = (props) => {
                         const newPlayer: Character = {
                             id: `player_${Date.now()}`,
                             name: `玩家_${Math.floor(Math.random() * 1000)}`,
-                            avatar: `https://i.pravatar.cc/100?img=${Math.floor(Math.random() * 70)}`,
+                            avatar: `/demo/sample-720ce98e.svg * 70)}`,
                             description: '真人玩家加入剧场',
                             status: 'idle'
                         };

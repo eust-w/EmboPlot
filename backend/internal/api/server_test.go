@@ -52,7 +52,7 @@ func (fakeGateway) ParseCharacter(_ context.Context, filename string, _ string) 
 	return models.Character{
 		ID:          "parsed_char",
 		Name:        "解析角色",
-		Avatar:      "https://i.pravatar.cc/300?u=parsed",
+		Avatar:      "/demo/sample-1799a760.svg?u=parsed",
 		Description: "从" + filename + "解析",
 		Personality: "结构化 personality",
 		Memory:      "结构化 memory",
@@ -65,7 +65,7 @@ func (fakeGateway) GenerateCharacter(context.Context, modelgateway.CharacterDraf
 	return models.Character{
 		ID:          "generated_char",
 		Name:        "星港守望者",
-		Avatar:      "https://i.pravatar.cc/300?u=generated",
+		Avatar:      "/demo/sample-1799a760.svg?u=generated",
 		Description: "根据提示词生成的角色",
 		Personality: "生成 personality",
 		Memory:      "生成 memory",

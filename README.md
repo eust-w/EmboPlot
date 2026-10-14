@@ -1,70 +1,83 @@
-# 随流剧场
+<div align="center">
+  <img src="docs/readme/hero.svg" width="100%" alt="EmboPlot · 随流剧场 workflow overview">
+  <h1>EmboPlot · 随流剧场</h1>
+  <p><strong>创建角色，编排故事，让多角色互动可检查。</strong></p>
+  <p><a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/License-Apache--2.0-d99536?style=flat-square"></a> <a href="docs/readme/validation.md"><img alt="Validation notes" src="https://img.shields.io/badge/Validation-repository%20checks-547ac4?style=flat-square"></a></p>
+  <p><a href="#overview">项目亮点</a> · <a href="#quick-start">快速开始</a> · <a href="#workflow">工作流</a> · <a href="#validation">验证</a> · <a href="#documentation">文档</a></p>
+  <p><a href="README.en.md">English</a> · <a href="README.md">简体中文</a></p>
+</div>
 
-互动式多角色剧场 demo。当前仓库包含 Vite/React 前端，以及 Go + MongoDB 后端 API。
+---
 
-## Run Locally
+<a id="overview"></a>
+## 项目亮点
 
-**Prerequisites:** Node.js, Go 1.24+, Docker
+基于 React、Go API、MongoDB 工作区和模型网关的多角色互动剧场。本地示例采用原创抽象 SVG 图片。
 
+| 能力 | 内容 |
+| :--- | :--- |
+| **故事工作区** | 角色、背景、房间与剧本导出。 |
+| **账户 API** | HttpOnly 会话与用户独立 MongoDB 工作区。 |
+| **模型网关** | 百炼适配器与确定性开发 fallback。 |
 
-1. Install dependencies:
-   `npm install`
-2. Copy `.env.example` to `.env` and set `AUTH_JWT_SECRET` plus `DASHSCOPE_API_KEY` for Alibaba Cloud Model Studio / 百炼 model calls.
-3. Start MongoDB:
-   `docker compose up -d mongodb`
-4. Start the Go API:
-   `npm run backend:dev`
-5. In another terminal, run the app:
-   `npm run dev`
+### 本地演示
 
-The frontend proxies `/api` to `http://localhost:8080` by default. Auth uses an HttpOnly session cookie, so frontend requests include credentials automatically. If the API is unavailable, the demo falls back to local mock data so UI work can continue.
+![EmboPlot · 随流剧场 local demonstration](docs/readme/theater.jpg)
 
-All model capabilities are routed through the Go backend. If `DASHSCOPE_API_KEY` is missing, the backend uses deterministic local fallback responses for development.
+*本轮本机截图；示例数据、回放与 fallback 模式见下方说明。*
 
-## Backend
+<a id="quick-start"></a>
+## 快速开始
 
-The backend lives in `backend/`:
+```bash
+git clone https://github.com/eust-w/EmboPlot.git
+cd EmboPlot
+npm ci
+cp .env.example .env
+# Set a random AUTH_JWT_SECRET in .env.
+# Start MongoDB locally, or set MONGODB_URI to your own instance.
+npm run backend:dev
+# In another terminal:
+npm run dev
+```
 
-- `cmd/server` starts the HTTP API.
-- `internal/api` owns routes, auth/session cookies, validation, exports, and onboarding parsing.
-- `internal/auth` owns password hashing and signed session tokens.
-- `internal/store` owns MongoDB persistence, user workspace seeding, and test-only memory storage.
-- `internal/models` mirrors the frontend data contracts.
+<a id="workflow"></a>
+## 工作流
 
-Useful commands:
+```text
+CREATE → DIRECT → PERFORM
+```
 
-- `npm run backend:test`
-- `cd backend && GOSUMDB=off go test ./...` if the Go checksum service is temporarily unreachable.
+```bash
+npm run backend:test
+npm run lint
+npm run build
+```
 
-Core routes:
+<a id="validation"></a>
+## 验证
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/session`
-- `GET /api/auth/me`
-- `GET /api/bootstrap`
-- `GET|POST /api/characters`
-- `PUT /api/characters/{id}`
-- `POST /api/characters/{id}/publish`
-- `GET|POST /api/stories`
-- `GET|POST /api/rooms`
-- `GET|PUT|DELETE /api/rooms/{id}`
-- `POST /api/rooms/{id}/lines`
-- `POST /api/rooms/{id}/generate`
-- `GET|PATCH /api/profile`
-- `POST /api/onboarding/parse-character`
-- `POST /api/exports/markdown`
-- `GET /api/models/capabilities`
-- `POST /api/models/character`
-- `POST /api/models/story`
-- `POST /api/models/image`
-- `POST /api/models/character-image`
-- `POST /api/models/story-image`
-- `POST /api/models/image-edit`
-- `POST /api/models/scene-image`
-- `POST /api/models/speech`
-- `POST /api/models/transcribe`
-- `POST /api/models/embed`
-- `POST /api/models/moderate`
-- `POST /api/models/vision`
+```bash
+npm run backend:test
+npm run lint
+npm run build
+```
+
+运行环境与已执行结果见 [validation notes](docs/readme/validation.md).
+
+| 项目 | 当前边界 |
+| :--- | :--- |
+| 模型模式 | 未配置 DASHSCOPE_API_KEY 时后端使用本地 fallback；API 不可用时前端可能使用演示数据。 |
+| 部署 | 部署需要随机 JWT secret、正确 ALLOWED_ORIGIN 和 HTTPS 安全 Cookie。 |
+| 支付 | 支付适配器需商户配置，本轮不声明真实支付验收。 |
+
+<a id="documentation"></a>
+## 文档
+
+- [Original demo assets / 原创示例](public/demo/README.md)
+- [Backend / 后端](backend/)
+- [Model gateway / 模型网关](backend/internal/modelgateway/)
+
+## 许可证与来源
+
+原创代码和新增演示资源采用 [Apache-2.0](LICENSE). 第三方代码、模型、数据和外部资源保留各自许可，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
