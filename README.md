@@ -81,3 +81,18 @@ npm run build
 ## 许可证与来源
 
 原创代码和新增演示资源采用 [Apache-2.0](LICENSE). 第三方代码、模型、数据和外部资源保留各自许可，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## 生产部署
+
+剧场使用独立子域名 `theater.claworkers.com`，服务器为 ECS `8.140.199.153`。启用 HTTPS 前，需要先添加指向该地址的 DNS A 记录。
+Nginx 提供 `/opt/emboplot/frontend` 的前端文件，并将 `/api/` 转发给监听 8080 端口的 `emboplot` systemd 服务。生产环境直接运行在宿主机上，不使用 Docker。
+
+DNS 配置完成后运行：
+
+```sh
+./scripts/finalize-production-domain.sh
+```
+
+脚本安装独立的 `/etc/nginx/conf.d/emboplot-theater.conf` 站点，申请可自动续期的 Let's Encrypt 证书，并更新后台来源、支付回调基础地址和安全 Cookie。默认复用服务器已有的 ACME 账号；需要创建账号时设置 `CERTBOT_EMAIL`。DNS 就绪前，可用 `EMBOPLOT_PREPARE_ONLY=1 ./scripts/finalize-production-domain.sh` 先准备 HTTP 站点。
+
+后续运行 `./scripts/deploy-production.sh` 部署更新。脚本直接检查剧场后端，再验证公网子域名。服务器上的其他站点单独管理。
