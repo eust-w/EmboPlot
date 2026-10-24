@@ -684,8 +684,8 @@ export default function App() {
             setInput={setInput}
             showMentions={showMentions}
             setShowMentions={setShowMentions}
-            sidebarOpen={true}
-            setSidebarOpen={() => {}}
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             setIsCreatorOpen={setIsCreatorOpen}

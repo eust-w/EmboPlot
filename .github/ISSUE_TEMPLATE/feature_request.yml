@@ -1,0 +1,20 @@
+name: Feature proposal / 功能建议
+description: Explain the creator workflow this would improve.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Which workflow is difficult today? / 当前哪一步难用？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior and alternatives / 期望方案与替代方式
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: How would we verify it works? / 如何验收？

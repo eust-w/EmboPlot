@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report / 私密安全反馈
+    url: https://github.com/eust-w/EmboPlot/security/advisories/new
+    about: Do not disclose exploitable vulnerabilities in public issues.

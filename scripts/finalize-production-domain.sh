@@ -2,10 +2,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DOMAIN="${EMBOPLOT_DOMAIN:-theater.claworkers.com}"
-SERVER_IP="${EMBOPLOT_SERVER_IP:-8.140.199.153}"
-KEY_PATH="${EMBOPLOT_DEPLOY_KEY:-$HOME/.ssh/emboflow-deploy}"
-REMOTE="${EMBOPLOT_DEPLOY_REMOTE:-root@8.140.199.153}"
+: "${EMBOPLOT_DOMAIN:?Set your theater domain}"
+: "${EMBOPLOT_SERVER_IP:?Set the destination server IPv4 address}"
+: "${EMBOPLOT_DEPLOY_KEY:?Set the path to your SSH deployment key}"
+: "${EMBOPLOT_DEPLOY_REMOTE:?Set your deployment account and host}"
+DOMAIN="$EMBOPLOT_DOMAIN"
+SERVER_IP="$EMBOPLOT_SERVER_IP"
+KEY_PATH="$EMBOPLOT_DEPLOY_KEY"
+REMOTE="$EMBOPLOT_DEPLOY_REMOTE"
 CERTBOT_EMAIL="${CERTBOT_EMAIL:--}"
 PREPARE_ONLY="${EMBOPLOT_PREPARE_ONLY:-0}"
 

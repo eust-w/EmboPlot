@@ -1,7 +1,11 @@
 {
   "name": "suiliu-theater",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0-alpha.1",
+  "description": "An open-source AI story theater with a cast, a director and a persistent timeline.",
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "https://github.com/eust-w/EmboPlot.git" },
+  "engines": { "node": ">=22.12.0" },
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
@@ -10,7 +14,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "docs:check": "node scripts/check-docs.mjs",
+    "showcase:record": "node scripts/showcase/record.mjs",
+    "showcase:video": "node scripts/showcase/render.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
@@ -33,6 +40,7 @@
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
+    "playwright": "1.64.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

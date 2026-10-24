@@ -2,11 +2,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-KEY_PATH="${EMBOPLOT_DEPLOY_KEY:-$HOME/.ssh/emboflow-deploy}"
-REMOTE="${EMBOPLOT_DEPLOY_REMOTE:-root@8.140.199.153}"
-REMOTE_FRONTEND_DIR="${EMBOPLOT_REMOTE_FRONTEND_DIR:-/opt/emboplot/frontend}"
-REMOTE_BACKEND_BIN="${EMBOPLOT_REMOTE_BACKEND_BIN:-/opt/emboplot/backend/emboplot-server}"
-PUBLIC_URL="${EMBOPLOT_PUBLIC_URL:-https://theater.claworkers.com}"
+: "${EMBOPLOT_DEPLOY_KEY:?Set the path to your SSH deployment key}"
+: "${EMBOPLOT_DEPLOY_REMOTE:?Set your deployment account and host}"
+: "${EMBOPLOT_PUBLIC_URL:?Set your public HTTPS origin}"
+KEY_PATH="$EMBOPLOT_DEPLOY_KEY"
+REMOTE="$EMBOPLOT_DEPLOY_REMOTE"
+PUBLIC_URL="$EMBOPLOT_PUBLIC_URL"
 
 if [[ ! -r "$KEY_PATH" ]]; then
   echo "Missing deploy key: $KEY_PATH" >&2
@@ -29,7 +30,7 @@ npm run build
 
 (
   cd backend
-  GOSUMDB=off go test ./...
+  go test ./...
   CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o "$backend_binary" ./cmd/server
 )
 

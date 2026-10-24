@@ -1,0 +1,98 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run docs:check
+      - run: npm audit --audit-level=high
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - run: go test -race -cover ./...
+        working-directory: backend
+      - run: go vet ./...
+        working-directory: backend
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: go build -o "$RUNNER_TEMP/emboplot-api" ./cmd/server
+        working-directory: backend
+      - name: Exercise the local creator workflow
+        env:
+          PORT: '18088'
+          MONGODB_URI: mongodb://127.0.0.1:27017
+          MONGODB_DATABASE: emboplot_showcase_ci
+          ALLOWED_ORIGIN: http://localhost:3197
+          PUBLIC_BASE_URL: http://localhost:3197
+          AUTH_COOKIE_SECURE: 'false'
+          DASHSCOPE_API_KEY: ''
+          HUPIJIAO_APP_ID: ''
+          HUPIJIAO_APP_SECRET: ''
+          VITE_API_PROXY_TARGET: http://127.0.0.1:18088
+        run: |
+          export AUTH_JWT_SECRET="$(openssl rand -hex 32)"
+          mkdir -p "$RUNNER_TEMP/emboplot-runtime" .artifacts/showcase
+          (cd "$RUNNER_TEMP/emboplot-runtime" && exec "$RUNNER_TEMP/emboplot-api") > .artifacts/showcase/api.log 2>&1 &
+          api_pid=$!
+          npm run dev -- --port 3197 --host 127.0.0.1 --strictPort > .artifacts/showcase/frontend.log 2>&1 &
+          ui_pid=$!
+          trap 'kill "$api_pid" "$ui_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS http://localhost:3197/api/health; then break; fi
+            sleep 1
+          done
+          curl -fsS http://localhost:3197/api/health
+          npm run showcase:record
+      - name: Retain local test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-evidence
+          path: |
+            .artifacts/showcase/
+            docs/media/*jpg
+          include-hidden-files: true
+          retention-days: 7

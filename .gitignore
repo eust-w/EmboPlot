@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+.artifacts/
+playwright-report/
+test-results/
+*.pem
+*.key

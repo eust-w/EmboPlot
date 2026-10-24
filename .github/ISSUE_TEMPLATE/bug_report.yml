@@ -1,0 +1,32 @@
+name: Bug report / 缺陷反馈
+description: A reproducible behavior problem, not a private security report.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 'Please remove API keys, cookies, payment data and private scripts. 请勿提交密钥、Cookie 或用户隐私。'
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce / 复现步骤
+      placeholder: '1. Open a room ...'
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior / 预期与实际结果
+    validations:
+      required: true
+  - type: dropdown
+    id: model_mode
+    attributes:
+      label: Model mode / 模型模式
+      options: [Live DashScope, Local fallback, Unknown]
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / 环境
+      placeholder: Commit, browser, OS, Node, Go, MongoDB version; sanitized logs or screenshots.
+    validations:
+      required: true
