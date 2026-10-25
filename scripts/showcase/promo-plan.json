@@ -1,0 +1,16 @@
+{
+  "title": "随流剧场 · EmboPlot",
+  "repository": "https://github.com/eust-w/EmboPlot",
+  "disclosure": "预置原创剧本演示 · AI 辅助插画与合成配音 · Alpha",
+  "segments": [
+    {"title":"下一幕，由你导演", "subtitle":"最后一段信号 / THE LAST SIGNAL", "asset":"observatory.jpg", "kind":"hero", "voice":"凌晨两点十七分，天文台收到一段来自未来的求救。这个故事，下一步由你来导演。"},
+    {"title":"给角色自己的性格", "subtitle":"背景 / 性格 / 记忆 / 音色", "asset":"character-details.jpg", "kind":"character", "voice":"这是随流剧场，一个已经开源的 AI 互动剧场。先设定角色的背景、性格、记忆和音色。"},
+    {"title":"搭舞台，选你的视角", "subtitle":"世界观 / 阵容 / 节奏", "asset":"setup.jpg", "kind":"setup", "voice":"再选择世界观、上场阵容和入场视角。你可以做导演，也可以成为角色。"},
+    {"title":"故事，不止有台词", "subtitle":"旁白 + 对白 + 明确的说话对象", "asset":"theater.jpg", "kind":"timeline", "voice":"剧情同时包含旁白和对白，明确谁对谁说话，也能自言自语，或者对大家说。"},
+    {"title":"随时改变故事走向", "subtitle":"自动 / 暂停 / 继续 / 手动", "asset":"theater.jpg", "kind":"control", "voice":"自动推演可以暂停、继续，也能手动推进。想改变方向，就输入导演指令。"},
+    {"title":"看见场景，听见角色", "subtitle":"场景图 / 多音色 / 顺序播放", "asset":"scene.jpg", "kind":"scene", "voice":"选中多句剧情，可以生成场景图。角色语音支持顺序播放，并提前缓存。"},
+    {"title":"把作品带走", "subtitle":"PNG 长图 / Markdown / WAV 音频", "asset":"theater.jpg", "kind":"export", "voice":"完成后，导出长图、剧本或整段音频，把作品带走。"},
+    {"title":"开放的不只是故事", "subtitle":"React + Go + MongoDB / 百炼模型", "asset":"observatory.jpg", "kind":"stack", "voice":"前端 React，后端 Go 和 MongoDB，模型接入阿里云百炼。代码已用 Apache 二点零协议开源。"},
+    {"title":"随流剧场，已经开源", "subtitle":"github.com/eust-w/EmboPlot", "asset":"observatory.jpg", "kind":"end", "voice":"当前是 Alpha 版本。画面使用预置原创剧本，不是实时生成结果。仓库地址在简介，欢迎来一起完善。"}
+  ]
+}

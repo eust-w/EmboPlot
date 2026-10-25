@@ -23,6 +23,8 @@ An open-source AI story theater with an ensemble cast, a director's console, sce
 
 ## Watch the demo
 
+**One-minute introduction (Chinese synthetic narration):** [Horizontal 1080p](https://github.com/eust-w/EmboPlot/releases/download/v0.1.0-alpha.1/EmboPlot-intro-horizontal-1080p.mp4) · [Vertical 1080p](https://github.com/eust-w/EmboPlot/releases/download/v0.1.0-alpha.1/EmboPlot-intro-vertical-1080p.mp4). Actual UI screenshots, a prewritten original story, and AI-assisted art; not live model generation. [Production notes](docs/promo-video.md).
+
 [![Play the subtitled workflow walkthrough](docs/media/demo.gif)](https://github.com/eust-w/EmboPlot/releases/download/v0.1.0-alpha.1/emboplot-walkthrough.mp4)
 
 **[Watch / download the full MP4](https://github.com/eust-w/EmboPlot/releases/download/v0.1.0-alpha.1/emboplot-walkthrough.mp4)** · [Sample script](docs/examples/the-last-signal.md) · [Reproduce the recording](docs/showcase.md)
