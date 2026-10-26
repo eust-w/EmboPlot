@@ -37,6 +37,8 @@ Publicly verified posts are tracked here; upload completion and review are not t
 - [X introduction](https://x.com/eustancewu/status/2114439227098448034)
 - [Douyin introduction](https://www.douyin.com/video/7700690048273894671), verified on the video page and marked normal in the creator dashboard.
 - Xiaohongshu: `我做了个能当导演的AI剧场`, note `6ade5952000000000803cf44`, verified in the published list and the video page. Use the platform's share flow if a direct web link requires a signed URL.
+- [YouTube introduction](https://www.youtube.com/watch?v=7jVgrSe9z4g), published publicly on 2026-10-26. The public player and native AI-content label were verified. A video-generated thumbnail is used because custom thumbnails require phone verification on the channel.
+- [Bilibili introduction](https://www.bilibili.com/video/BV18Rn96oEHe/), published on 2026-10-26 after review and 1080p transcoding completed. The public player, title, description, author, and native AI-content label were verified.
 
 Other destinations are not implied by these results. Signed viewer URLs are deliberately excluded.
 

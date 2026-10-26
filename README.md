@@ -23,6 +23,8 @@
 
 ## 观看演示
 
+[B 站项目介绍](https://www.bilibili.com/video/BV18Rn96oEHe/) · [YouTube 项目介绍](https://www.youtube.com/watch?v=7jVgrSe9z4g) · [各平台发布记录](docs/promo-video.md#distribution)
+
 **一分钟项目介绍（中文合成配音）**：[横屏 1080p](https://github.com/eust-w/EmboPlot/releases/download/v0.1.0-alpha.1/EmboPlot-intro-horizontal-1080p.mp4) · [竖屏 1080p](https://github.com/eust-w/EmboPlot/releases/download/v0.1.0-alpha.1/EmboPlot-intro-vertical-1080p.mp4)。使用真实界面截图、原创预置剧本和 AI 辅助插画，不是实时生成展示。[制作说明](docs/promo-video.md)。
 
 [![点击观看带中英字幕的完整工作流视频](docs/media/demo.gif)](https://github.com/eust-w/EmboPlot/releases/download/v0.1.0-alpha.1/emboplot-walkthrough.mp4)

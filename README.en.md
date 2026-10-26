@@ -23,6 +23,8 @@ An open-source AI story theater with an ensemble cast, a director's console, sce
 
 ## Watch the demo
 
+[Watch on Bilibili](https://www.bilibili.com/video/BV18Rn96oEHe/) · [Watch on YouTube](https://www.youtube.com/watch?v=7jVgrSe9z4g) · [Distribution status](docs/promo-video.md#distribution)
+
 **One-minute introduction (Chinese synthetic narration):** [Horizontal 1080p](https://github.com/eust-w/EmboPlot/releases/download/v0.1.0-alpha.1/EmboPlot-intro-horizontal-1080p.mp4) · [Vertical 1080p](https://github.com/eust-w/EmboPlot/releases/download/v0.1.0-alpha.1/EmboPlot-intro-vertical-1080p.mp4). Actual UI screenshots, a prewritten original story, and AI-assisted art; not live model generation. [Production notes](docs/promo-video.md).
 
 [![Play the subtitled workflow walkthrough](docs/media/demo.gif)](https://github.com/eust-w/EmboPlot/releases/download/v0.1.0-alpha.1/emboplot-walkthrough.mp4)
